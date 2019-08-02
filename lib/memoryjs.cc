@@ -21,6 +21,7 @@ using v8::Exception;
 using v8::Function;
 using v8::FunctionCallbackInfo;
 using v8::Isolate;
+using v8::Context;
 using v8::Local;
 using v8::Object;
 using v8::String;
@@ -46,14 +47,15 @@ struct Vector4 {
 
 void memoryjs::throwError(char* error, Isolate* isolate) {
   isolate->ThrowException(
-    Exception::TypeError(String::NewFromUtf8(isolate, error))
+    Exception::TypeError(String::NewFromUtf8(isolate, error, v8::NewStringType::kNormal).ToLocalChecked())
   );
   return;
 }
 
 void openProcess(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
-  
+  Local<Context> ctx = isolate->GetCurrentContext();
+
   if (args.Length() != 1 && args.Length() != 2) {
     memoryjs::throwError("requires 1 argument, or 2 arguments if a callback is being used", isolate);
     return;
@@ -85,7 +87,7 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
   }
 
   if (args[0]->IsNumber()) {
-    pair = Process.openProcess((args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust()), &errorMessage);
+    pair = Process.openProcess((args[0]->Uint32Value(ctx).FromJust()), &errorMessage);
 
     // In case it failed to open, let's keep retrying
     // while(!strcmp(process.szExeFile, "")) {
@@ -103,16 +105,25 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
   // Create a v8 Object (JSON) to store the process information
   Local<Object> processInfo = Object::New(isolate);
 
-  processInfo->Set(String::NewFromUtf8(isolate, "dwSize"), Number::New(isolate, (int)pair.process.dwSize));
-  processInfo->Set(String::NewFromUtf8(isolate, "th32ProcessID"), Number::New(isolate, (int)pair.process.th32ProcessID));
-  processInfo->Set(String::NewFromUtf8(isolate, "cntThreads"), Number::New(isolate, (int)pair.process.cntThreads));
-  processInfo->Set(String::NewFromUtf8(isolate, "th32ParentProcessID"), Number::New(isolate, (int)pair.process.th32ParentProcessID));
-  processInfo->Set(String::NewFromUtf8(isolate, "pcPriClassBase"), Number::New(isolate, (int)pair.process.pcPriClassBase));
-  processInfo->Set(String::NewFromUtf8(isolate, "szExeFile"), String::NewFromUtf8(isolate, (char*)pair.process.szExeFile));
-  processInfo->Set(String::NewFromUtf8(isolate, "handle"), Number::New(isolate, (int)pair.handle));
+  processInfo->Set(ctx, String::NewFromUtf8(isolate, "dwSize", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (int)pair.process.dwSize));
+  processInfo->Set(ctx, String::NewFromUtf8(isolate, "th32ProcessID", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (int)pair.process.th32ProcessID));
+  processInfo->Set(ctx, String::NewFromUtf8(isolate, "cntThreads", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (int)pair.process.cntThreads));
+  processInfo->Set(ctx, String::NewFromUtf8(isolate, "th32ParentProcessID", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (int)pair.process.th32ParentProcessID));
+  processInfo->Set(ctx, String::NewFromUtf8(isolate, "pcPriClassBase", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (int)pair.process.pcPriClassBase));
+  processInfo->Set(ctx, String::NewFromUtf8(isolate, "szExeFile", v8::NewStringType::kNormal).ToLocalChecked(), 
+    String::NewFromUtf8(isolate, (char*)pair.process.szExeFile, v8::NewStringType::kNormal).ToLocalChecked());
+  processInfo->Set(ctx, String::NewFromUtf8(isolate, "handle", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (int)pair.handle));
 
   DWORD64 base = module::getBaseAddress((char *)pair.process.szExeFile, pair.process.th32ProcessID);
-  processInfo->Set(String::NewFromUtf8(isolate, "modBaseAddr"), Number::New(isolate, (uintptr_t)base));
+  processInfo->Set(ctx, 
+    String::NewFromUtf8(isolate, "modBaseAddr", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (uintptr_t)base));
 
   // openProcess can either take one argument or can take
   // two arguments for asychronous use (second argument is the callback)
@@ -120,8 +131,11 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
     // Callback to let the user handle with the information
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
-    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), processInfo };
-    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+    Local<Value> argv[argc] = { 
+      String::NewFromUtf8(isolate, errorMessage, v8::NewStringType::kNormal).ToLocalChecked(), 
+      processInfo 
+    };
+    callback->Call(ctx, Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(processInfo);
@@ -130,6 +144,7 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
 
 void closeProcess(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 1) {
     memoryjs::throwError("requires 1 argument", isolate);
@@ -141,11 +156,12 @@ void closeProcess(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  Process.closeProcess((HANDLE)args[0]->Int32Value(isolate->GetCurrentContext()).FromJust());
+  Process.closeProcess((HANDLE)args[0]->Int32Value(ctx).FromJust());
 }
 
 void getProcesses(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() > 1) {
     memoryjs::throwError("requires either 0 arguments or 1 argument if a callback is being used", isolate);
@@ -177,14 +193,19 @@ void getProcesses(const FunctionCallbackInfo<Value>& args) {
     // Create a v8 object to store the current process' information
     Local<Object> process = Object::New(isolate);
 
-    process->Set(String::NewFromUtf8(isolate, "cntThreads"), Number::New(isolate, (int)processEntries[i].cntThreads));
-    process->Set(String::NewFromUtf8(isolate, "szExeFile"), String::NewFromUtf8(isolate, (char *)processEntries[i].szExeFile));
-    process->Set(String::NewFromUtf8(isolate, "th32ProcessID"), Number::New(isolate, (int)processEntries[i].th32ProcessID));
-    process->Set(String::NewFromUtf8(isolate, "th32ParentProcessID"), Number::New(isolate, (int)processEntries[i].th32ParentProcessID));
-    process->Set(String::NewFromUtf8(isolate, "pcPriClassBase"), Number::New(isolate, (int)processEntries[i].pcPriClassBase));
+    process->Set(ctx, String::NewFromUtf8(isolate, "cntThreads", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (int)processEntries[i].cntThreads));
+    process->Set(ctx, String::NewFromUtf8(isolate, "szExeFile", v8::NewStringType::kNormal).ToLocalChecked(), 
+      String::NewFromUtf8(isolate, (char *)processEntries[i].szExeFile, v8::NewStringType::kNormal).ToLocalChecked());
+    process->Set(ctx, String::NewFromUtf8(isolate, "th32ProcessID", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (int)processEntries[i].th32ProcessID));
+    process->Set(ctx, String::NewFromUtf8(isolate, "th32ParentProcessID", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (int)processEntries[i].th32ParentProcessID));
+    process->Set(ctx, String::NewFromUtf8(isolate, "pcPriClassBase", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (int)processEntries[i].pcPriClassBase));
 
     // Push the object to the array
-    processes->Set(i, process);
+    processes->Set(ctx, i, process);
   }
 
   /* getProcesses can either take no arguments or one argument
@@ -193,8 +214,8 @@ void getProcesses(const FunctionCallbackInfo<Value>& args) {
     // Callback to let the user handle with the information
     Local<Function> callback = Local<Function>::Cast(args[0]);
     const unsigned argc = 2;
-    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), processes };
-    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage, v8::NewStringType::kNormal).ToLocalChecked(), processes };
+    callback->Call(ctx, Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(processes);
@@ -203,6 +224,7 @@ void getProcesses(const FunctionCallbackInfo<Value>& args) {
 
 void getModules(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 1 && args.Length() != 2) {
     memoryjs::throwError("requires 1 argument, or 2 arguments if a callback is being used", isolate);
@@ -222,7 +244,7 @@ void getModules(const FunctionCallbackInfo<Value>& args) {
   // Define error message that may be set by the function that gets the modules
   char* errorMessage = "";
 
-  std::vector<MODULEENTRY32> moduleEntries = module::getModules(args[0]->Int32Value(isolate->GetCurrentContext()).FromJust(), &errorMessage);
+  std::vector<MODULEENTRY32> moduleEntries = module::getModules(args[0]->Int32Value(ctx).FromJust(), &errorMessage);
 
   // If an error message was returned from the function getting the modules, throw the error.
   // Only throw an error if there is no callback (if there's a callback, the error is passed there).
@@ -240,14 +262,19 @@ void getModules(const FunctionCallbackInfo<Value>& args) {
     //  Create a v8 object to store the current module's information
     Local<Object> module = Object::New(isolate);
 
-    module->Set(String::NewFromUtf8(isolate, "modBaseAddr"), Number::New(isolate, (uintptr_t)moduleEntries[i].modBaseAddr));
-    module->Set(String::NewFromUtf8(isolate, "modBaseSize"), Number::New(isolate, (int)moduleEntries[i].modBaseSize));
-    module->Set(String::NewFromUtf8(isolate, "szExePath"), String::NewFromUtf8(isolate, (char *)moduleEntries[i].szExePath));
-    module->Set(String::NewFromUtf8(isolate, "szModule"), String::NewFromUtf8(isolate, (char *)moduleEntries[i].szModule));
-    module->Set(String::NewFromUtf8(isolate, "th32ModuleID"), Number::New(isolate, (int)moduleEntries[i].th32ProcessID));
+    module->Set(ctx, String::NewFromUtf8(isolate, "modBaseAddr", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (uintptr_t)moduleEntries[i].modBaseAddr));
+    module->Set(ctx, String::NewFromUtf8(isolate, "modBaseSize", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (int)moduleEntries[i].modBaseSize));
+    module->Set(ctx, String::NewFromUtf8(isolate, "szExePath", v8::NewStringType::kNormal).ToLocalChecked(), 
+      String::NewFromUtf8(isolate, (char *)moduleEntries[i].szExePath, v8::NewStringType::kNormal).ToLocalChecked());
+    module->Set(ctx, String::NewFromUtf8(isolate, "szModule", v8::NewStringType::kNormal).ToLocalChecked(), 
+      String::NewFromUtf8(isolate, (char *)moduleEntries[i].szModule, v8::NewStringType::kNormal).ToLocalChecked());
+    module->Set(ctx, String::NewFromUtf8(isolate, "th32ModuleID", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (int)moduleEntries[i].th32ProcessID));
 
     // Push the object to the array
-    modules->Set(i, module);
+    modules->Set(ctx, i, module);
   }
 
   // getModules can either take one argument or two arguments
@@ -256,8 +283,8 @@ void getModules(const FunctionCallbackInfo<Value>& args) {
     // Callback to let the user handle with the information
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
-    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), modules };
-    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage, v8::NewStringType::kNormal).ToLocalChecked(), modules };
+    callback->Call(ctx, Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(modules);
@@ -266,6 +293,7 @@ void getModules(const FunctionCallbackInfo<Value>& args) {
 
 void findModule(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 1 && args.Length() != 2 && args.Length() != 3) {
     memoryjs::throwError("requires 1 argument, 2 arguments, or 3 arguments if a callback is being used", isolate);
@@ -287,7 +315,7 @@ void findModule(const FunctionCallbackInfo<Value>& args) {
   // Define error message that may be set by the function that gets the modules
   char* errorMessage = "";
 
-  MODULEENTRY32 module = module::findModule((char*) *(moduleName), args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(), &errorMessage);
+  MODULEENTRY32 module = module::findModule((char*) *(moduleName), args[1]->Int32Value(ctx).FromJust(), &errorMessage);
 
   // If an error message was returned from the function getting the module, throw the error.
   // Only throw an error if there is no callback (if there's a callback, the error is passed there).
@@ -298,18 +326,24 @@ void findModule(const FunctionCallbackInfo<Value>& args) {
 
   // In case it failed to open, let's keep retrying
   while (!strcmp((char *)module.szExePath, "")) {
-    module = module::findModule((char*) *(moduleName), args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(), &errorMessage);
+    module = module::findModule((char*) *(moduleName), args[1]->Int32Value(ctx).FromJust(), &errorMessage);
   };
 
   // Create a v8 Object (JSON) to store the process information
   Local<Object> moduleInfo = Object::New(isolate);
 
-  moduleInfo->Set(String::NewFromUtf8(isolate, "modBaseAddr"), Number::New(isolate, (uintptr_t)module.modBaseAddr));
-  moduleInfo->Set(String::NewFromUtf8(isolate, "modBaseSize"), Number::New(isolate, (int)module.modBaseSize));
-  moduleInfo->Set(String::NewFromUtf8(isolate, "szExePath"), String::NewFromUtf8(isolate, (char *)module.szExePath));
-  moduleInfo->Set(String::NewFromUtf8(isolate, "szModule"), String::NewFromUtf8(isolate, (char *)module.szModule));
-  moduleInfo->Set(String::NewFromUtf8(isolate, "th32ProcessID"), Number::New(isolate, (int)module.th32ProcessID));
-  moduleInfo->Set(String::NewFromUtf8(isolate, "hModule"), Number::New(isolate, (uintptr_t)module.hModule));
+  moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "modBaseAddr", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (uintptr_t)module.modBaseAddr));
+  moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "modBaseSize", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (int)module.modBaseSize));
+  moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "szExePath", v8::NewStringType::kNormal).ToLocalChecked(), 
+    String::NewFromUtf8(isolate, (char *)module.szExePath, v8::NewStringType::kNormal).ToLocalChecked());
+  moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "szModule", v8::NewStringType::kNormal).ToLocalChecked(), 
+    String::NewFromUtf8(isolate, (char *)module.szModule, v8::NewStringType::kNormal).ToLocalChecked());
+  moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "th32ProcessID", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (int)module.th32ProcessID));
+  moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "hModule", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (uintptr_t)module.hModule));
 
   // findModule can either take one or two arguments,
   // three arguments for asychronous use (third argument is the callback)
@@ -317,8 +351,11 @@ void findModule(const FunctionCallbackInfo<Value>& args) {
     // Callback to let the user handle with the information
     Local<Function> callback = Local<Function>::Cast(args[2]);
     const unsigned argc = 2;
-    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), moduleInfo };
-    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+    Local<Value> argv[argc] = { 
+      String::NewFromUtf8(isolate, errorMessage, v8::NewStringType::kNormal).ToLocalChecked(), 
+      moduleInfo 
+    };
+    callback->Call(ctx, Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(moduleInfo);
@@ -327,6 +364,7 @@ void findModule(const FunctionCallbackInfo<Value>& args) {
 
 void readMemory(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 3 && args.Length() != 4) {
     memoryjs::throwError("requires 3 arguments, or 4 arguments if a callback is being used", isolate);
@@ -352,10 +390,10 @@ void readMemory(const FunctionCallbackInfo<Value>& args) {
   Local<Value> argv[argc];
 
   // Define the error message that will be set if no data type is recognised
-  argv[0] = String::NewFromUtf8(isolate, "");
+  argv[0] = String::NewFromUtf8(isolate, "", v8::NewStringType::kNormal).ToLocalChecked();
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(ctx).FromJust();
+  DWORD64 address = args[1]->IntegerValue(ctx).FromJust();
 
   if (!strcmp(dataType, "byte")) {
 
@@ -460,15 +498,15 @@ void readMemory(const FunctionCallbackInfo<Value>& args) {
 
     if (chars.size() == 0) {
     
-      if (args.Length() == 4) argv[0] = String::NewFromUtf8(isolate, "unable to read string (no null-terminator found after 1 million chars)");
+      if (args.Length() == 4) argv[0] = String::NewFromUtf8(isolate, "unable to read string (no null-terminator found after 1 million chars)", v8::NewStringType::kNormal).ToLocalChecked();
       else return memoryjs::throwError("unable to read string (no null-terminator found after 1 million chars)", isolate);
     
     } else {
       // vector -> string
       std::string str(chars.begin(), chars.end());
 
-      if (args.Length() == 4) argv[1] = String::NewFromUtf8(isolate, str.c_str());
-      else args.GetReturnValue().Set(String::NewFromUtf8(isolate, str.c_str()));
+      if (args.Length() == 4) argv[1] = String::NewFromUtf8(isolate, str.c_str(), v8::NewStringType::kNormal).ToLocalChecked();
+      else args.GetReturnValue().Set(String::NewFromUtf8(isolate, str.c_str(), v8::NewStringType::kNormal).ToLocalChecked());
     
     }
 
@@ -476,9 +514,12 @@ void readMemory(const FunctionCallbackInfo<Value>& args) {
 
     Vector3 result = Memory.readMemory<Vector3>(handle, address);
     Local<Object> moduleInfo = Object::New(isolate);
-    moduleInfo->Set(String::NewFromUtf8(isolate, "x"), Number::New(isolate, result.x));
-    moduleInfo->Set(String::NewFromUtf8(isolate, "y"), Number::New(isolate, result.y));
-    moduleInfo->Set(String::NewFromUtf8(isolate, "z"), Number::New(isolate, result.z));
+    moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "x", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, result.x));
+    moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "y", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, result.y));
+    moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "z", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, result.z));
 
     if (args.Length() == 4) argv[1] = moduleInfo;
     else args.GetReturnValue().Set(moduleInfo);
@@ -487,26 +528,31 @@ void readMemory(const FunctionCallbackInfo<Value>& args) {
     
     Vector4 result = Memory.readMemory<Vector4>(handle, address);
     Local<Object> moduleInfo = Object::New(isolate);
-    moduleInfo->Set(String::NewFromUtf8(isolate, "w"), Number::New(isolate, result.w));
-    moduleInfo->Set(String::NewFromUtf8(isolate, "x"), Number::New(isolate, result.x));
-    moduleInfo->Set(String::NewFromUtf8(isolate, "y"), Number::New(isolate, result.y));
-    moduleInfo->Set(String::NewFromUtf8(isolate, "z"), Number::New(isolate, result.z));
+    moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "w", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, result.w));
+    moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "x", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, result.x));
+    moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "y", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, result.y));
+    moduleInfo->Set(ctx, String::NewFromUtf8(isolate, "z", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, result.z));
 
     if (args.Length() == 4) argv[1] = moduleInfo;
     else args.GetReturnValue().Set(moduleInfo);
 
   } else {
 
-    if (args.Length() == 4) argv[0] = String::NewFromUtf8(isolate, "unexpected data type");
+    if (args.Length() == 4) argv[0] = String::NewFromUtf8(isolate, "unexpected data type", v8::NewStringType::kNormal).ToLocalChecked();
     else return memoryjs::throwError("unexpected data type", isolate);
 
   }
 
-  if (args.Length() == 4) callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+  if (args.Length() == 4) callback->Call(ctx, Null(isolate), argc, argv);
 }
 
 void readBuffer(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 3 && args.Length() != 4) {
     memoryjs::throwError("requires 3 arguments, or 4 arguments if a callback is being used", isolate);
@@ -529,18 +575,18 @@ void readBuffer(const FunctionCallbackInfo<Value>& args) {
   Local<Value> argv[argc];
 
   // Define the error message that will be set if no data type is recognised
-  argv[0] = String::NewFromUtf8(isolate, "");
+  argv[0] = String::NewFromUtf8(isolate, "", v8::NewStringType::kNormal).ToLocalChecked();
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  SIZE_T size = args[2]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(ctx).FromJust();
+  DWORD64 address = args[1]->IntegerValue(ctx).FromJust();
+  SIZE_T size = args[2]->IntegerValue(ctx).FromJust();
   char* data = Memory.readBuffer(handle, address, size);
 
   auto buffer = node::Buffer::New(isolate, data, size).ToLocalChecked();
 
   if (args.Length() == 4) {
     argv[1] = buffer;
-    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+    callback->Call(ctx, Null(isolate), argc, argv);
   } else {
     args.GetReturnValue().Set(buffer);
   }
@@ -548,6 +594,7 @@ void readBuffer(const FunctionCallbackInfo<Value>& args) {
 
 void writeMemory(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 4) {
     memoryjs::throwError("requires 4 arguments", isolate);
@@ -562,60 +609,60 @@ void writeMemory(const FunctionCallbackInfo<Value>& args) {
   v8::String::Utf8Value dataTypeArg(isolate, args[3]);
   char* dataType = (char*)*(dataTypeArg);
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(ctx).FromJust();
+  DWORD64 address = args[1]->IntegerValue(ctx).FromJust();
 
   if (!strcmp(dataType, "byte")) {
   
-    Memory.writeMemory<unsigned char>(handle, address, args[2]->Uint32Value(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<unsigned char>(handle, address, args[2]->Uint32Value(ctx).FromJust());
   
   } else if (!strcmp(dataType, "int")) {
 
-    Memory.writeMemory<int>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<int>(handle, address, args[2]->NumberValue(ctx).FromJust());
 
   } else if (!strcmp(dataType, "int32")) {
 
-    Memory.writeMemory<int32_t>(handle, address, args[2]->Int32Value(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<int32_t>(handle, address, args[2]->Int32Value(ctx).FromJust());
 
   } else if (!strcmp(dataType, "uint32")) {
 
-    Memory.writeMemory<uint32_t>(handle, address, args[2]->Uint32Value(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<uint32_t>(handle, address, args[2]->Uint32Value(ctx).FromJust());
 
   } else if (!strcmp(dataType, "int64")) {
 
-    Memory.writeMemory<int64_t>(handle, address, args[2]->IntegerValue(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<int64_t>(handle, address, args[2]->IntegerValue(ctx).FromJust());
 
   } else if (!strcmp(dataType, "uint64")) {
 
-    Memory.writeMemory<uint64_t>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<uint64_t>(handle, address, args[2]->NumberValue(ctx).FromJust());
 
   } else if (!strcmp(dataType, "dword")) {
 
-    Memory.writeMemory<DWORD>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<DWORD>(handle, address, args[2]->NumberValue(ctx).FromJust());
 
   } else if (!strcmp(dataType, "short")) {
 
-    Memory.writeMemory<short>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<short>(handle, address, args[2]->NumberValue(ctx).FromJust());
 
   } else if (!strcmp(dataType, "long")) {
 
-    Memory.writeMemory<long>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<long>(handle, address, args[2]->NumberValue(ctx).FromJust());
 
   } else if (!strcmp(dataType, "float")) {
 
-    Memory.writeMemory<float>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<float>(handle, address, args[2]->NumberValue(ctx).FromJust());
 
   } else if (!strcmp(dataType, "double")) {
 
-    Memory.writeMemory<double>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<double>(handle, address, args[2]->NumberValue(ctx).FromJust());
 
   } else if (!strcmp(dataType, "bool") || !strcmp(dataType, "boolean")) {
 
-    Memory.writeMemory<bool>(handle, address, args[2]->BooleanValue(isolate->GetCurrentContext()).FromJust());
+    Memory.writeMemory<bool>(handle, address, args[2]->BooleanValue(isolate));
 
   } else if (!strcmp(dataType, "string") || !strcmp(dataType, "str")) {
 
-    v8::String::Utf8Value valueParam(isolate, args[2]->ToString(isolate));
+    v8::String::Utf8Value valueParam(isolate, args[2]->ToString(ctx).ToLocalChecked());
     
     // Write String, Method 1
     //Memory.writeMemory<std::string>(handle, address, std::string(*valueParam));
@@ -627,9 +674,9 @@ void writeMemory(const FunctionCallbackInfo<Value>& args) {
 
     Local<Object> value = Local<Object>::Cast(args[2]);
     Vector3 vector = {
-      value->Get(String::NewFromUtf8(isolate, "x"))->NumberValue(isolate->GetCurrentContext()).FromJust(),
-      value->Get(String::NewFromUtf8(isolate, "y"))->NumberValue(isolate->GetCurrentContext()).FromJust(),
-      value->Get(String::NewFromUtf8(isolate, "z"))->NumberValue(isolate->GetCurrentContext()).FromJust()
+      value->Get(ctx, String::NewFromUtf8(isolate, "x", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust(),
+      value->Get(ctx, String::NewFromUtf8(isolate, "y", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust(),
+      value->Get(ctx, String::NewFromUtf8(isolate, "z", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust()
     };
     Memory.writeMemory<Vector3>(handle, address, vector);
 
@@ -637,10 +684,10 @@ void writeMemory(const FunctionCallbackInfo<Value>& args) {
 
     Local<Object> value = Local<Object>::Cast(args[2]);
     Vector4 vector = {
-      value->Get(String::NewFromUtf8(isolate, "w"))->NumberValue(isolate->GetCurrentContext()).FromJust(),
-      value->Get(String::NewFromUtf8(isolate, "x"))->NumberValue(isolate->GetCurrentContext()).FromJust(),
-      value->Get(String::NewFromUtf8(isolate, "y"))->NumberValue(isolate->GetCurrentContext()).FromJust(),
-      value->Get(String::NewFromUtf8(isolate, "z"))->NumberValue(isolate->GetCurrentContext()).FromJust()
+      value->Get(ctx, String::NewFromUtf8(isolate, "w", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust(),
+      value->Get(ctx, String::NewFromUtf8(isolate, "x", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust(),
+      value->Get(ctx, String::NewFromUtf8(isolate, "y", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust(),
+      value->Get(ctx, String::NewFromUtf8(isolate, "z", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust()
     };
     Memory.writeMemory<Vector4>(handle, address, vector);
 
@@ -653,6 +700,7 @@ void writeMemory(const FunctionCallbackInfo<Value>& args) {
 
 void writeBuffer(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 3) {
     memoryjs::throwError("required 3 arguments", isolate);
@@ -664,8 +712,8 @@ void writeBuffer(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(ctx).FromJust();
+  DWORD64 address = args[1]->IntegerValue(ctx).FromJust();
   SIZE_T length = node::Buffer::Length(args[2]);
   char* data = node::Buffer::Data(args[2]);
   Memory.writeMemory<char*>(handle, address, data, length);
@@ -673,6 +721,7 @@ void writeBuffer(const FunctionCallbackInfo<Value>& args) {
 
 void findPattern(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   // if (args.Length() != 5 && args.Length() != 6) {
   //   memoryjs::throwError("requires 5 arguments, or 6 arguments if a callback is being used", isolate);
@@ -695,7 +744,7 @@ void findPattern(const FunctionCallbackInfo<Value>& args) {
   // Define error message that may be set by the function that gets the modules
   char* errorMessage = "";
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(ctx).FromJust();
 
   std::vector<MODULEENTRY32> moduleEntries = module::getModules(GetProcessId(handle), &errorMessage);
 
@@ -710,12 +759,12 @@ void findPattern(const FunctionCallbackInfo<Value>& args) {
     v8::String::Utf8Value moduleName(isolate, args[1]);
 
     if (!strcmp((char *)moduleEntries[i].szModule, std::string(*moduleName).c_str())) {
-      v8::String::Utf8Value signature(isolate, args[2]->ToString(isolate));
+      v8::String::Utf8Value signature(isolate, args[2]->ToString(ctx).ToLocalChecked());
 
       // const char* pattern = std::string(*signature).c_str();
-      short sigType = args[3]->Uint32Value(isolate->GetCurrentContext()).FromJust();
-      uint32_t patternOffset = args[4]->Uint32Value(isolate->GetCurrentContext()).FromJust();
-      uint32_t addressOffset = args[5]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+      short sigType = args[3]->Uint32Value(ctx).FromJust();
+      uint32_t patternOffset = args[4]->Uint32Value(ctx).FromJust();
+      uint32_t addressOffset = args[5]->Uint32Value(ctx).FromJust();
 
       address = Pattern.findPattern(handle, moduleEntries[i], std::string(*signature).c_str(), sigType, patternOffset, addressOffset);
       break;
@@ -733,8 +782,11 @@ void findPattern(const FunctionCallbackInfo<Value>& args) {
     // Callback to let the user handle with the information
     Local<Function> callback = Local<Function>::Cast(args[6]);
     const unsigned argc = 2;
-    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), Number::New(isolate, address) };
-    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+    Local<Value> argv[argc] = { 
+      String::NewFromUtf8(isolate, errorMessage, v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, address) 
+    };
+    callback->Call(ctx, Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(Number::New(isolate, address));
