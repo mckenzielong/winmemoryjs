@@ -795,6 +795,7 @@ void findPattern(const FunctionCallbackInfo<Value>& args) {
 
 void callFunction(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 4 && args.Length() != 5) {
     memoryjs::throwError("requires 4 arguments, 5 with callback", isolate);
@@ -815,19 +816,22 @@ void callFunction(const FunctionCallbackInfo<Value>& args) {
   std::vector<Arg> parsedArgs;
   Local<Array> arguments = Local<Array>::Cast(args[1]);
   for (unsigned int i = 0; i < arguments->Length(); i++) {
-    Local<Object> argument = Local<Object>::Cast(arguments->Get(i));
+    Local<Object> argument = Local<Object>::Cast(arguments->Get(ctx, i).ToLocalChecked());
 
-    Type type = (Type) argument->Get(String::NewFromUtf8(isolate, "type"))->Uint32Value(isolate->GetCurrentContext()).FromJust();
+    Type type = (Type) argument->Get(ctx, String::NewFromUtf8(isolate, "type", v8::NewStringType::kNormal).ToLocalChecked())
+      .ToLocalChecked()->Uint32Value(ctx).FromJust();
     
     if (type == T_STRING) {
-      Local<Value> data = argument->Get(String::NewFromUtf8(isolate, "value"));
-      v8::String::Utf8Value stringValueUtf(isolate, data->ToString(isolate));
+      Local<Value> data = argument->Get(ctx, String::NewFromUtf8(isolate, "value", v8::NewStringType::kNormal).ToLocalChecked())
+        .ToLocalChecked();
+      v8::String::Utf8Value stringValueUtf(isolate, data->ToString(ctx).ToLocalChecked());
       std::string stringValue = std::string(*stringValueUtf);
       parsedArgs.push_back({ type, &stringValue });
     }
 
     if (type == T_INT) {
-      int data = argument->Get(String::NewFromUtf8(isolate, "value"))->NumberValue(isolate->GetCurrentContext()).FromJust();
+      int data = argument->Get(ctx, String::NewFromUtf8(isolate, "value", v8::NewStringType::kNormal).ToLocalChecked())
+        .ToLocalChecked()->NumberValue(ctx).FromJust();
 
       // As we only pass the addresses of the variable to the `call` function and not a copy
       // of the variable itself, we need to ensure that the variable stays alive and in a unique
@@ -842,7 +846,8 @@ void callFunction(const FunctionCallbackInfo<Value>& args) {
     }
 
     if (type == T_FLOAT) {
-      float data = argument->Get(String::NewFromUtf8(isolate, "value"))->NumberValue(isolate->GetCurrentContext()).FromJust();
+      float data = argument->Get(ctx, String::NewFromUtf8(isolate, "value", v8::NewStringType::kNormal).ToLocalChecked())
+        .ToLocalChecked()->NumberValue(ctx).FromJust();
 
       float* memory = (float*) malloc(sizeof(float));
       *memory = data;
@@ -852,9 +857,9 @@ void callFunction(const FunctionCallbackInfo<Value>& args) {
     }
   }
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  Type returnType = (Type) args[2]->Uint32Value(isolate->GetCurrentContext()).FromJust();
-  DWORD64 address = args[3]->NumberValue(isolate->GetCurrentContext()).FromJust();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(ctx).FromJust();
+  Type returnType = (Type) args[2]->Uint32Value(ctx).FromJust();
+  DWORD64 address = args[3]->NumberValue(ctx).FromJust();
 
   char* errorMessage = "";
   Call data = functions::call<int>(handle, parsedArgs, returnType, address, &errorMessage);
@@ -867,43 +872,42 @@ void callFunction(const FunctionCallbackInfo<Value>& args) {
   heap.clear();
 
   Local<Object> info = Object::New(isolate);
-
-  Local<String> keyString = String::NewFromUtf8(isolate, "returnValue");
+  Local<String> keyString = String::NewFromUtf8(isolate, "returnValue", v8::NewStringType::kNormal).ToLocalChecked();
   
   if (returnType == T_STRING) {
-    info->Set(keyString, String::NewFromUtf8(isolate, data.returnString.c_str()));
+    info->Set(ctx, keyString, String::NewFromUtf8(isolate, data.returnString.c_str(), v8::NewStringType::kNormal).ToLocalChecked());
   }
   
   if (returnType == T_CHAR) {
-    info->Set(keyString, Number::New(isolate, (char) data.returnValue));
+    info->Set(ctx, keyString, Number::New(isolate, (char) data.returnValue));
   }
 
   if (returnType == T_BOOL) {
-    info->Set(keyString, Number::New(isolate, (bool) data.returnValue));
+    info->Set(ctx, keyString, Number::New(isolate, (bool) data.returnValue));
   }
 
   if (returnType == T_INT) {
-    info->Set(keyString, Number::New(isolate, (int) data.returnValue));
+    info->Set(ctx, keyString, Number::New(isolate, (int) data.returnValue));
   }
 
   if (returnType == T_FLOAT) {
     float value = *(float *)&data.returnValue;
-    info->Set(keyString, Number::New(isolate, value));
+    info->Set(ctx, keyString, Number::New(isolate, value));
   }
 
   if (returnType == T_DOUBLE) {
     double value = *(double *)&data.returnValue;
-    info->Set(keyString, Number::New(isolate, value));
+    info->Set(ctx, keyString, Number::New(isolate, value));
   }
 
-  info->Set(String::NewFromUtf8(isolate, "exitCode"), Number::New(isolate, data.exitCode));
+  info->Set(ctx, String::NewFromUtf8(isolate, "exitCode", v8::NewStringType::kNormal).ToLocalChecked(), Number::New(isolate, data.exitCode));
 
   if (args.Length() == 5) {
     // Callback to let the user handle with the information
     Local<Function> callback = Local<Function>::Cast(args[2]);
     const unsigned argc = 2;
-    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), info };
-    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage, v8::NewStringType::kNormal).ToLocalChecked(), info };
+    callback->Call(ctx, Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(info);
