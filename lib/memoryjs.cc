@@ -26,8 +26,8 @@ using v8::Object;
 using v8::String;
 using v8::Number;
 using v8::Value;
-using v8::Handle;
 using v8::Array;
+using v8::Local;
 using v8::Boolean;
 
 process Process;
@@ -75,7 +75,7 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
   process::Pair pair;
 
   if (args[0]->IsString()) {
-    v8::String::Utf8Value processName(args[0]);  
+    v8::String::Utf8Value processName(isolate, args[0]);  
     pair = Process.openProcess((char*) *(processName), &errorMessage);
 
     // In case it failed to open, let's keep retrying
@@ -85,7 +85,7 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
   }
 
   if (args[0]->IsNumber()) {
-    pair = Process.openProcess(args[0]->Uint32Value(), &errorMessage);
+    pair = Process.openProcess((args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust()), &errorMessage);
 
     // In case it failed to open, let's keep retrying
     // while(!strcmp(process.szExeFile, "")) {
@@ -108,10 +108,10 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
   processInfo->Set(String::NewFromUtf8(isolate, "cntThreads"), Number::New(isolate, (int)pair.process.cntThreads));
   processInfo->Set(String::NewFromUtf8(isolate, "th32ParentProcessID"), Number::New(isolate, (int)pair.process.th32ParentProcessID));
   processInfo->Set(String::NewFromUtf8(isolate, "pcPriClassBase"), Number::New(isolate, (int)pair.process.pcPriClassBase));
-  processInfo->Set(String::NewFromUtf8(isolate, "szExeFile"), String::NewFromUtf8(isolate, pair.process.szExeFile));
+  processInfo->Set(String::NewFromUtf8(isolate, "szExeFile"), String::NewFromUtf8(isolate, (char*)pair.process.szExeFile));
   processInfo->Set(String::NewFromUtf8(isolate, "handle"), Number::New(isolate, (int)pair.handle));
 
-  DWORD64 base = module::getBaseAddress(pair.process.szExeFile, pair.process.th32ProcessID);
+  DWORD64 base = module::getBaseAddress((char *)pair.process.szExeFile, pair.process.th32ProcessID);
   processInfo->Set(String::NewFromUtf8(isolate, "modBaseAddr"), Number::New(isolate, (uintptr_t)base));
 
   // openProcess can either take one argument or can take
@@ -121,7 +121,7 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), processInfo };
-    callback->Call(Null(isolate), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(processInfo);
@@ -141,7 +141,7 @@ void closeProcess(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  Process.closeProcess((HANDLE)args[0]->Int32Value());
+  Process.closeProcess((HANDLE)args[0]->Int32Value(isolate->GetCurrentContext()).FromJust());
 }
 
 void getProcesses(const FunctionCallbackInfo<Value>& args) {
@@ -170,7 +170,7 @@ void getProcesses(const FunctionCallbackInfo<Value>& args) {
   }
 
   // Creates v8 array with the size being that of the processEntries vector processes is an array of JavaScript objects
-  Handle<Array> processes = Array::New(isolate, processEntries.size());
+  Local<Array> processes = Array::New(isolate, processEntries.size());
 
   // Loop over all processes found
   for (std::vector<PROCESSENTRY32>::size_type i = 0; i != processEntries.size(); i++) {
@@ -178,7 +178,7 @@ void getProcesses(const FunctionCallbackInfo<Value>& args) {
     Local<Object> process = Object::New(isolate);
 
     process->Set(String::NewFromUtf8(isolate, "cntThreads"), Number::New(isolate, (int)processEntries[i].cntThreads));
-    process->Set(String::NewFromUtf8(isolate, "szExeFile"), String::NewFromUtf8(isolate, processEntries[i].szExeFile));
+    process->Set(String::NewFromUtf8(isolate, "szExeFile"), String::NewFromUtf8(isolate, (char *)processEntries[i].szExeFile));
     process->Set(String::NewFromUtf8(isolate, "th32ProcessID"), Number::New(isolate, (int)processEntries[i].th32ProcessID));
     process->Set(String::NewFromUtf8(isolate, "th32ParentProcessID"), Number::New(isolate, (int)processEntries[i].th32ParentProcessID));
     process->Set(String::NewFromUtf8(isolate, "pcPriClassBase"), Number::New(isolate, (int)processEntries[i].pcPriClassBase));
@@ -194,7 +194,7 @@ void getProcesses(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[0]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), processes };
-    callback->Call(Null(isolate), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(processes);
@@ -222,7 +222,7 @@ void getModules(const FunctionCallbackInfo<Value>& args) {
   // Define error message that may be set by the function that gets the modules
   char* errorMessage = "";
 
-  std::vector<MODULEENTRY32> moduleEntries = module::getModules(args[0]->Int32Value(), &errorMessage);
+  std::vector<MODULEENTRY32> moduleEntries = module::getModules(args[0]->Int32Value(isolate->GetCurrentContext()).FromJust(), &errorMessage);
 
   // If an error message was returned from the function getting the modules, throw the error.
   // Only throw an error if there is no callback (if there's a callback, the error is passed there).
@@ -233,7 +233,7 @@ void getModules(const FunctionCallbackInfo<Value>& args) {
 
   // Creates v8 array with the size being that of the moduleEntries vector
   // modules is an array of JavaScript objects
-  Handle<Array> modules = Array::New(isolate, moduleEntries.size());
+  Local<Array> modules = Array::New(isolate, moduleEntries.size());
 
   // Loop over all modules found
   for (std::vector<MODULEENTRY32>::size_type i = 0; i != moduleEntries.size(); i++) {
@@ -242,8 +242,8 @@ void getModules(const FunctionCallbackInfo<Value>& args) {
 
     module->Set(String::NewFromUtf8(isolate, "modBaseAddr"), Number::New(isolate, (uintptr_t)moduleEntries[i].modBaseAddr));
     module->Set(String::NewFromUtf8(isolate, "modBaseSize"), Number::New(isolate, (int)moduleEntries[i].modBaseSize));
-    module->Set(String::NewFromUtf8(isolate, "szExePath"), String::NewFromUtf8(isolate, moduleEntries[i].szExePath));
-    module->Set(String::NewFromUtf8(isolate, "szModule"), String::NewFromUtf8(isolate, moduleEntries[i].szModule));
+    module->Set(String::NewFromUtf8(isolate, "szExePath"), String::NewFromUtf8(isolate, (char *)moduleEntries[i].szExePath));
+    module->Set(String::NewFromUtf8(isolate, "szModule"), String::NewFromUtf8(isolate, (char *)moduleEntries[i].szModule));
     module->Set(String::NewFromUtf8(isolate, "th32ModuleID"), Number::New(isolate, (int)moduleEntries[i].th32ProcessID));
 
     // Push the object to the array
@@ -257,7 +257,7 @@ void getModules(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), modules };
-    callback->Call(Null(isolate), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(modules);
@@ -282,12 +282,12 @@ void findModule(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 	
-  v8::String::Utf8Value moduleName(args[0]);
+  v8::String::Utf8Value moduleName(isolate, args[0]);
 	
   // Define error message that may be set by the function that gets the modules
   char* errorMessage = "";
 
-  MODULEENTRY32 module = module::findModule((char*) *(moduleName), args[1]->Int32Value(), &errorMessage);
+  MODULEENTRY32 module = module::findModule((char*) *(moduleName), args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(), &errorMessage);
 
   // If an error message was returned from the function getting the module, throw the error.
   // Only throw an error if there is no callback (if there's a callback, the error is passed there).
@@ -297,8 +297,8 @@ void findModule(const FunctionCallbackInfo<Value>& args) {
   }
 
   // In case it failed to open, let's keep retrying
-  while (!strcmp(module.szExePath, "")) {
-    module = module::findModule((char*) *(moduleName), args[1]->Int32Value(), &errorMessage);
+  while (!strcmp((char *)module.szExePath, "")) {
+    module = module::findModule((char*) *(moduleName), args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(), &errorMessage);
   };
 
   // Create a v8 Object (JSON) to store the process information
@@ -306,8 +306,8 @@ void findModule(const FunctionCallbackInfo<Value>& args) {
 
   moduleInfo->Set(String::NewFromUtf8(isolate, "modBaseAddr"), Number::New(isolate, (uintptr_t)module.modBaseAddr));
   moduleInfo->Set(String::NewFromUtf8(isolate, "modBaseSize"), Number::New(isolate, (int)module.modBaseSize));
-  moduleInfo->Set(String::NewFromUtf8(isolate, "szExePath"), String::NewFromUtf8(isolate, module.szExePath));
-  moduleInfo->Set(String::NewFromUtf8(isolate, "szModule"), String::NewFromUtf8(isolate, module.szModule));
+  moduleInfo->Set(String::NewFromUtf8(isolate, "szExePath"), String::NewFromUtf8(isolate, (char *)module.szExePath));
+  moduleInfo->Set(String::NewFromUtf8(isolate, "szModule"), String::NewFromUtf8(isolate, (char *)module.szModule));
   moduleInfo->Set(String::NewFromUtf8(isolate, "th32ProcessID"), Number::New(isolate, (int)module.th32ProcessID));
   moduleInfo->Set(String::NewFromUtf8(isolate, "hModule"), Number::New(isolate, (uintptr_t)module.hModule));
 
@@ -318,7 +318,7 @@ void findModule(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[2]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), moduleInfo };
-    callback->Call(Null(isolate), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(moduleInfo);
@@ -343,7 +343,7 @@ void readMemory(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  v8::String::Utf8Value dataTypeArg(args[2]);
+  v8::String::Utf8Value dataTypeArg(isolate, args[2]);
   char* dataType = (char*) *(dataTypeArg);
 
   // Set callback variables in the case the a callback parameter has been passed
@@ -354,8 +354,8 @@ void readMemory(const FunctionCallbackInfo<Value>& args) {
   // Define the error message that will be set if no data type is recognised
   argv[0] = String::NewFromUtf8(isolate, "");
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue();
-  DWORD64 address = args[1]->IntegerValue();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
   if (!strcmp(dataType, "byte")) {
 
@@ -502,7 +502,7 @@ void readMemory(const FunctionCallbackInfo<Value>& args) {
 
   }
 
-  if (args.Length() == 4) callback->Call(Null(isolate), argc, argv);
+  if (args.Length() == 4) callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
 }
 
 void readBuffer(const FunctionCallbackInfo<Value>& args) {
@@ -531,16 +531,16 @@ void readBuffer(const FunctionCallbackInfo<Value>& args) {
   // Define the error message that will be set if no data type is recognised
   argv[0] = String::NewFromUtf8(isolate, "");
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue();
-  DWORD64 address = args[1]->IntegerValue();
-  SIZE_T size = args[2]->IntegerValue();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  SIZE_T size = args[2]->IntegerValue(isolate->GetCurrentContext()).FromJust();
   char* data = Memory.readBuffer(handle, address, size);
 
   auto buffer = node::Buffer::New(isolate, data, size).ToLocalChecked();
 
   if (args.Length() == 4) {
     argv[1] = buffer;
-    callback->Call(Null(isolate), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
   } else {
     args.GetReturnValue().Set(buffer);
   }
@@ -559,63 +559,63 @@ void writeMemory(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  v8::String::Utf8Value dataTypeArg(args[3]);
+  v8::String::Utf8Value dataTypeArg(isolate, args[3]);
   char* dataType = (char*)*(dataTypeArg);
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue();
-  DWORD64 address = args[1]->IntegerValue();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
   if (!strcmp(dataType, "byte")) {
   
-    Memory.writeMemory<unsigned char>(handle, address, args[2]->Uint32Value());
+    Memory.writeMemory<unsigned char>(handle, address, args[2]->Uint32Value(isolate->GetCurrentContext()).FromJust());
   
   } else if (!strcmp(dataType, "int")) {
 
-    Memory.writeMemory<int>(handle, address, args[2]->NumberValue());
+    Memory.writeMemory<int>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
 
   } else if (!strcmp(dataType, "int32")) {
 
-    Memory.writeMemory<int32_t>(handle, address, args[2]->Int32Value());
+    Memory.writeMemory<int32_t>(handle, address, args[2]->Int32Value(isolate->GetCurrentContext()).FromJust());
 
   } else if (!strcmp(dataType, "uint32")) {
 
-    Memory.writeMemory<uint32_t>(handle, address, args[2]->Uint32Value());
+    Memory.writeMemory<uint32_t>(handle, address, args[2]->Uint32Value(isolate->GetCurrentContext()).FromJust());
 
   } else if (!strcmp(dataType, "int64")) {
 
-    Memory.writeMemory<int64_t>(handle, address, args[2]->IntegerValue());
+    Memory.writeMemory<int64_t>(handle, address, args[2]->IntegerValue(isolate->GetCurrentContext()).FromJust());
 
   } else if (!strcmp(dataType, "uint64")) {
 
-    Memory.writeMemory<uint64_t>(handle, address, args[2]->NumberValue());
+    Memory.writeMemory<uint64_t>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
 
   } else if (!strcmp(dataType, "dword")) {
 
-    Memory.writeMemory<DWORD>(handle, address, args[2]->NumberValue());
+    Memory.writeMemory<DWORD>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
 
   } else if (!strcmp(dataType, "short")) {
 
-    Memory.writeMemory<short>(handle, address, args[2]->NumberValue());
+    Memory.writeMemory<short>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
 
   } else if (!strcmp(dataType, "long")) {
 
-    Memory.writeMemory<long>(handle, address, args[2]->NumberValue());
+    Memory.writeMemory<long>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
 
   } else if (!strcmp(dataType, "float")) {
 
-    Memory.writeMemory<float>(handle, address, args[2]->NumberValue());
+    Memory.writeMemory<float>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
 
   } else if (!strcmp(dataType, "double")) {
 
-    Memory.writeMemory<double>(handle, address, args[2]->NumberValue());
+    Memory.writeMemory<double>(handle, address, args[2]->NumberValue(isolate->GetCurrentContext()).FromJust());
 
   } else if (!strcmp(dataType, "bool") || !strcmp(dataType, "boolean")) {
 
-    Memory.writeMemory<bool>(handle, address, args[2]->BooleanValue());
+    Memory.writeMemory<bool>(handle, address, args[2]->BooleanValue(isolate->GetCurrentContext()).FromJust());
 
   } else if (!strcmp(dataType, "string") || !strcmp(dataType, "str")) {
 
-    v8::String::Utf8Value valueParam(args[2]->ToString());
+    v8::String::Utf8Value valueParam(isolate, args[2]->ToString(isolate));
     
     // Write String, Method 1
     //Memory.writeMemory<std::string>(handle, address, std::string(*valueParam));
@@ -625,22 +625,22 @@ void writeMemory(const FunctionCallbackInfo<Value>& args) {
     
   } else if (!strcmp(dataType, "vector3") || !strcmp(dataType, "vec3")) {
 
-    Handle<Object> value = Handle<Object>::Cast(args[2]);
+    Local<Object> value = Local<Object>::Cast(args[2]);
     Vector3 vector = {
-      value->Get(String::NewFromUtf8(isolate, "x"))->NumberValue(),
-      value->Get(String::NewFromUtf8(isolate, "y"))->NumberValue(),
-      value->Get(String::NewFromUtf8(isolate, "z"))->NumberValue()
+      value->Get(String::NewFromUtf8(isolate, "x"))->NumberValue(isolate->GetCurrentContext()).FromJust(),
+      value->Get(String::NewFromUtf8(isolate, "y"))->NumberValue(isolate->GetCurrentContext()).FromJust(),
+      value->Get(String::NewFromUtf8(isolate, "z"))->NumberValue(isolate->GetCurrentContext()).FromJust()
     };
     Memory.writeMemory<Vector3>(handle, address, vector);
 
   } else if (!strcmp(dataType, "vector4") || !strcmp(dataType, "vec4")) {
 
-    Handle<Object> value = Handle<Object>::Cast(args[2]);
+    Local<Object> value = Local<Object>::Cast(args[2]);
     Vector4 vector = {
-      value->Get(String::NewFromUtf8(isolate, "w"))->NumberValue(),
-      value->Get(String::NewFromUtf8(isolate, "x"))->NumberValue(),
-      value->Get(String::NewFromUtf8(isolate, "y"))->NumberValue(),
-      value->Get(String::NewFromUtf8(isolate, "z"))->NumberValue()
+      value->Get(String::NewFromUtf8(isolate, "w"))->NumberValue(isolate->GetCurrentContext()).FromJust(),
+      value->Get(String::NewFromUtf8(isolate, "x"))->NumberValue(isolate->GetCurrentContext()).FromJust(),
+      value->Get(String::NewFromUtf8(isolate, "y"))->NumberValue(isolate->GetCurrentContext()).FromJust(),
+      value->Get(String::NewFromUtf8(isolate, "z"))->NumberValue(isolate->GetCurrentContext()).FromJust()
     };
     Memory.writeMemory<Vector4>(handle, address, vector);
 
@@ -664,8 +664,8 @@ void writeBuffer(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue();
-  DWORD64 address = args[1]->IntegerValue();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
   SIZE_T length = node::Buffer::Length(args[2]);
   char* data = node::Buffer::Data(args[2]);
   Memory.writeMemory<char*>(handle, address, data, length);
@@ -695,7 +695,7 @@ void findPattern(const FunctionCallbackInfo<Value>& args) {
   // Define error message that may be set by the function that gets the modules
   char* errorMessage = "";
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
   std::vector<MODULEENTRY32> moduleEntries = module::getModules(GetProcessId(handle), &errorMessage);
 
@@ -707,15 +707,15 @@ void findPattern(const FunctionCallbackInfo<Value>& args) {
   }
 
   for (std::vector<MODULEENTRY32>::size_type i = 0; i != moduleEntries.size(); i++) {
-    v8::String::Utf8Value moduleName(args[1]);
+    v8::String::Utf8Value moduleName(isolate, args[1]);
 
-    if (!strcmp(moduleEntries[i].szModule, std::string(*moduleName).c_str())) {
-      v8::String::Utf8Value signature(args[2]->ToString());
+    if (!strcmp((char *)moduleEntries[i].szModule, std::string(*moduleName).c_str())) {
+      v8::String::Utf8Value signature(isolate, args[2]->ToString(isolate));
 
       // const char* pattern = std::string(*signature).c_str();
-      short sigType = args[3]->Uint32Value();
-      uint32_t patternOffset = args[4]->Uint32Value();
-      uint32_t addressOffset = args[5]->Uint32Value();
+      short sigType = args[3]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+      uint32_t patternOffset = args[4]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+      uint32_t addressOffset = args[5]->Uint32Value(isolate->GetCurrentContext()).FromJust();
 
       address = Pattern.findPattern(handle, moduleEntries[i], std::string(*signature).c_str(), sigType, patternOffset, addressOffset);
       break;
@@ -734,7 +734,7 @@ void findPattern(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[6]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), Number::New(isolate, address) };
-    callback->Call(Null(isolate), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(Number::New(isolate, address));
@@ -761,21 +761,21 @@ void callFunction(const FunctionCallbackInfo<Value>& args) {
   std::vector<LPVOID> heap;
 
   std::vector<Arg> parsedArgs;
-  Handle<Array> arguments = Handle<Array>::Cast(args[1]);
+  Local<Array> arguments = Local<Array>::Cast(args[1]);
   for (unsigned int i = 0; i < arguments->Length(); i++) {
-    Handle<Object> argument = Handle<Object>::Cast(arguments->Get(i));
+    Local<Object> argument = Local<Object>::Cast(arguments->Get(i));
 
-    Type type = (Type) argument->Get(String::NewFromUtf8(isolate, "type"))->Uint32Value();
+    Type type = (Type) argument->Get(String::NewFromUtf8(isolate, "type"))->Uint32Value(isolate->GetCurrentContext()).FromJust();
     
     if (type == T_STRING) {
-      Handle<Value> data = argument->Get(String::NewFromUtf8(isolate, "value"));
-      v8::String::Utf8Value stringValueUtf(data->ToString());
+      Local<Value> data = argument->Get(String::NewFromUtf8(isolate, "value"));
+      v8::String::Utf8Value stringValueUtf(isolate, data->ToString(isolate));
       std::string stringValue = std::string(*stringValueUtf);
       parsedArgs.push_back({ type, &stringValue });
     }
 
     if (type == T_INT) {
-      int data = argument->Get(String::NewFromUtf8(isolate, "value"))->NumberValue();
+      int data = argument->Get(String::NewFromUtf8(isolate, "value"))->NumberValue(isolate->GetCurrentContext()).FromJust();
 
       // As we only pass the addresses of the variable to the `call` function and not a copy
       // of the variable itself, we need to ensure that the variable stays alive and in a unique
@@ -790,7 +790,7 @@ void callFunction(const FunctionCallbackInfo<Value>& args) {
     }
 
     if (type == T_FLOAT) {
-      float data = argument->Get(String::NewFromUtf8(isolate, "value"))->NumberValue();
+      float data = argument->Get(String::NewFromUtf8(isolate, "value"))->NumberValue(isolate->GetCurrentContext()).FromJust();
 
       float* memory = (float*) malloc(sizeof(float));
       *memory = data;
@@ -800,9 +800,9 @@ void callFunction(const FunctionCallbackInfo<Value>& args) {
     }
   }
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue();
-  Type returnType = (Type) args[2]->Uint32Value();
-  DWORD64 address = args[3]->NumberValue();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  Type returnType = (Type) args[2]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  DWORD64 address = args[3]->NumberValue(isolate->GetCurrentContext()).FromJust();
 
   char* errorMessage = "";
   Call data = functions::call<int>(handle, parsedArgs, returnType, address, &errorMessage);
@@ -851,7 +851,7 @@ void callFunction(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[2]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), info };
-    callback->Call(Null(isolate), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(info);
@@ -878,10 +878,10 @@ void virtualProtectEx(const FunctionCallbackInfo<Value>& args) {
   }
 
   DWORD result;
-  HANDLE handle = (HANDLE)args[0]->IntegerValue();
-  DWORD64 address = args[1]->IntegerValue();
-  SIZE_T size = args[2]->IntegerValue();
-  DWORD protection = args[3]->Uint32Value();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  SIZE_T size = args[2]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  DWORD protection = args[3]->Uint32Value(isolate->GetCurrentContext()).FromJust();
 
   bool success = VirtualProtectEx(handle, (LPVOID) address, size, protection, &result);
 
@@ -906,7 +906,7 @@ void virtualProtectEx(const FunctionCallbackInfo<Value>& args) {
       String::NewFromUtf8(isolate, errorMessage),
       Number::New(isolate, result)
     };
-    callback->Call(Null(isolate), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
   } else {
     args.GetReturnValue().Set(Number::New(isolate, result));
   }
@@ -930,10 +930,10 @@ void getRegions(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
   std::vector<MEMORY_BASIC_INFORMATION> regions = Memory.getRegions(handle);
 
-  Handle<Array> regionsArray = Array::New(isolate, regions.size());
+  Local<Array> regionsArray = Array::New(isolate, regions.size());
 
   for (std::vector<MEMORY_BASIC_INFORMATION>::size_type i = 0; i != regions.size(); i++) {
     Local<Object> region = Object::New(isolate);
@@ -962,7 +962,7 @@ void getRegions(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, ""), regionsArray };
-    callback->Call(Null(isolate), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(regionsArray);
@@ -987,8 +987,8 @@ void virtualQueryEx(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue();
-  DWORD64 address = args[1]->IntegerValue();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
   MEMORY_BASIC_INFORMATION information;
   SIZE_T result = VirtualQueryEx(handle, (LPVOID)address, &information, sizeof(information));
@@ -1021,7 +1021,7 @@ void virtualQueryEx(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, ""), region };
-    callback->Call(Null(isolate), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(region);
@@ -1046,17 +1046,17 @@ void virtualAllocEx(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue();
-  SIZE_T size = args[2]->IntegerValue();
-  DWORD allocationType = args[3]->Uint32Value();
-  DWORD protection = args[4]->Uint32Value();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  SIZE_T size = args[2]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  DWORD allocationType = args[3]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  DWORD protection = args[4]->Uint32Value(isolate->GetCurrentContext()).FromJust();
   LPVOID address;
 
   // Means in the JavaScript space `null` was passed through.
   if (args[1] == Null(isolate)) {
     address = NULL;
   } else {
-    address = (LPVOID) args[1]->IntegerValue();
+    address = (LPVOID) args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
   }
 
   LPVOID allocatedAddress = VirtualAllocEx(handle, address, size, allocationType, protection);
@@ -1083,7 +1083,7 @@ void virtualAllocEx(const FunctionCallbackInfo<Value>& args) {
       String::NewFromUtf8(isolate, errorMessage),
       Number::New(isolate, (int)allocatedAddress)
     };
-    callback->Call(Null(isolate), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
   } else {
     args.GetReturnValue().Set(Number::New(isolate, (int)allocatedAddress));
   }
@@ -1102,8 +1102,8 @@ void attachDebugger(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  DWORD processId = args[0]->Uint32Value();
-  bool killOnExit = args[1]->BooleanValue();
+  DWORD processId = args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  bool killOnExit = args[1]->BooleanValue(isolate->GetCurrentContext()).FromJust();
 
   bool success = debugger::attach(processId, killOnExit);
   args.GetReturnValue().Set(Boolean::New(isolate, success));
@@ -1112,7 +1112,7 @@ void attachDebugger(const FunctionCallbackInfo<Value>& args) {
 void detatchDebugger(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
 
-  DWORD processId = args[0]->Uint32Value();
+  DWORD processId = args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust();
 
   if (args.Length() != 1) {
     memoryjs::throwError("requires only 1 argument", isolate);
@@ -1141,12 +1141,12 @@ void awaitDebugEvent(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  int millisTimeout = args[1]->Uint32Value();
+  int millisTimeout = args[1]->Uint32Value(isolate->GetCurrentContext()).FromJust();
 
   DebugEvent debugEvent;
   bool success = debugger::awaitDebugEvent(millisTimeout, &debugEvent);
 
-  Register hardwareRegister = static_cast<Register>(args[0]->Uint32Value());
+  Register hardwareRegister = static_cast<Register>(args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust());
 
   if (success && debugEvent.hardwareRegister == hardwareRegister) {
     Local<Object> info = Object::New(isolate);
@@ -1181,8 +1181,8 @@ void handleDebugEvent(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  DWORD processId = args[0]->Uint32Value();
-  DWORD threadId = args[1]->Uint32Value();
+  DWORD processId = args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  DWORD threadId = args[1]->Uint32Value(isolate->GetCurrentContext()).FromJust();
 
   bool success = debugger::handleDebugEvent(processId, threadId);
   args.GetReturnValue().Set(Boolean::New(isolate, success));
@@ -1203,16 +1203,16 @@ void setHardwareBreakpoint(const FunctionCallbackInfo<Value>& args) {
     }
   }
 
-  DWORD processId = args[0]->Uint32Value();
-  DWORD64 address = args[1]->IntegerValue();
-  Register hardwareRegister = static_cast<Register>(args[2]->Uint32Value());
+  DWORD processId = args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  Register hardwareRegister = static_cast<Register>(args[2]->Uint32Value(isolate->GetCurrentContext()).FromJust());
 
   // Execute = 0x0
   // Access = 0x3
   // Writer = 0x1
-  int trigger = args[3]->Uint32Value();
+  int trigger = args[3]->Uint32Value(isolate->GetCurrentContext()).FromJust();
   
-  int length = args[4]->Uint32Value();
+  int length = args[4]->Uint32Value(isolate->GetCurrentContext()).FromJust();
 
   bool success = debugger::setHardwareBreakpoint(processId, address, hardwareRegister, trigger, length);
   args.GetReturnValue().Set(Boolean::New(isolate, success));
@@ -1231,8 +1231,8 @@ void removeHardwareBreakpoint(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  DWORD processId = args[0]->Uint32Value();
-  Register hardwareRegister = static_cast<Register>(args[1]->Uint32Value());
+  DWORD processId = args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  Register hardwareRegister = static_cast<Register>(args[1]->Uint32Value(isolate->GetCurrentContext()).FromJust());
 
   bool success = debugger::setHardwareBreakpoint(processId, 0, hardwareRegister, 0, 0);
   args.GetReturnValue().Set(Boolean::New(isolate, success));
