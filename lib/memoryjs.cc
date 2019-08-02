@@ -121,7 +121,7 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), processInfo };
-    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(processInfo);
@@ -194,7 +194,7 @@ void getProcesses(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[0]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), processes };
-    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(processes);
@@ -257,7 +257,7 @@ void getModules(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), modules };
-    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(modules);
@@ -318,7 +318,7 @@ void findModule(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[2]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), moduleInfo };
-    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(moduleInfo);
@@ -502,7 +502,7 @@ void readMemory(const FunctionCallbackInfo<Value>& args) {
 
   }
 
-  if (args.Length() == 4) callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+  if (args.Length() == 4) callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
 }
 
 void readBuffer(const FunctionCallbackInfo<Value>& args) {
@@ -540,7 +540,7 @@ void readBuffer(const FunctionCallbackInfo<Value>& args) {
 
   if (args.Length() == 4) {
     argv[1] = buffer;
-    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
   } else {
     args.GetReturnValue().Set(buffer);
   }
@@ -734,7 +734,7 @@ void findPattern(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[6]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), Number::New(isolate, address) };
-    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(Number::New(isolate, address));
@@ -851,7 +851,7 @@ void callFunction(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[2]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage), info };
-    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(info);
@@ -906,7 +906,7 @@ void virtualProtectEx(const FunctionCallbackInfo<Value>& args) {
       String::NewFromUtf8(isolate, errorMessage),
       Number::New(isolate, result)
     };
-    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
   } else {
     args.GetReturnValue().Set(Number::New(isolate, result));
   }
@@ -962,7 +962,7 @@ void getRegions(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, ""), regionsArray };
-    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(regionsArray);
@@ -1021,7 +1021,7 @@ void virtualQueryEx(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = { String::NewFromUtf8(isolate, ""), region };
-    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(region);
@@ -1083,7 +1083,7 @@ void virtualAllocEx(const FunctionCallbackInfo<Value>& args) {
       String::NewFromUtf8(isolate, errorMessage),
       Number::New(isolate, (int)allocatedAddress)
     };
-    callback->Call(isolate->GetCurrentContext(), args.This(), argc, argv);
+    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
   } else {
     args.GetReturnValue().Set(Number::New(isolate, (int)allocatedAddress));
   }
