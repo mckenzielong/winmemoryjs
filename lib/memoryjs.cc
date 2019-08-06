@@ -917,6 +917,7 @@ void callFunction(const FunctionCallbackInfo<Value>& args) {
 
 void virtualProtectEx(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 4 && args.Length() != 5) {
     memoryjs::throwError("requires 4 arguments, 5 with callback", isolate);
@@ -934,10 +935,10 @@ void virtualProtectEx(const FunctionCallbackInfo<Value>& args) {
   }
 
   DWORD result;
-  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  SIZE_T size = args[2]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  DWORD protection = args[3]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(ctx).FromJust();
+  DWORD64 address = args[1]->IntegerValue(ctx).FromJust();
+  SIZE_T size = args[2]->IntegerValue(ctx).FromJust();
+  DWORD protection = args[3]->Uint32Value(ctx).FromJust();
 
   bool success = VirtualProtectEx(handle, (LPVOID) address, size, protection, &result);
 
@@ -959,10 +960,10 @@ void virtualProtectEx(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[5]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = {
-      String::NewFromUtf8(isolate, errorMessage),
+      String::NewFromUtf8(isolate, errorMessage, v8::NewStringType::kNormal).ToLocalChecked(),
       Number::New(isolate, result)
     };
-    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+    callback->Call(ctx, Null(isolate), argc, argv);
   } else {
     args.GetReturnValue().Set(Number::New(isolate, result));
   }
@@ -970,6 +971,7 @@ void virtualProtectEx(const FunctionCallbackInfo<Value>& args) {
 
 void getRegions(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 1 && args.Length() != 2) {
     memoryjs::throwError("requires 1 argument, 2 with callback", isolate);
@@ -986,7 +988,7 @@ void getRegions(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(ctx).FromJust();
   std::vector<MEMORY_BASIC_INFORMATION> regions = Memory.getRegions(handle);
 
   Local<Array> regionsArray = Array::New(isolate, regions.size());
@@ -994,31 +996,39 @@ void getRegions(const FunctionCallbackInfo<Value>& args) {
   for (std::vector<MEMORY_BASIC_INFORMATION>::size_type i = 0; i != regions.size(); i++) {
     Local<Object> region = Object::New(isolate);
 
-    region->Set(String::NewFromUtf8(isolate, "BaseAddress"), Number::New(isolate, (DWORD64) regions[i].BaseAddress));
-    region->Set(String::NewFromUtf8(isolate, "AllocationBase"), Number::New(isolate, (DWORD64) regions[i].AllocationBase));
-    region->Set(String::NewFromUtf8(isolate, "AllocationProtect"), Number::New(isolate, (DWORD) regions[i].AllocationProtect));
-    region->Set(String::NewFromUtf8(isolate, "RegionSize"), Number::New(isolate, (SIZE_T) regions[i].RegionSize));
-    region->Set(String::NewFromUtf8(isolate, "State"), Number::New(isolate, (DWORD) regions[i].State));
-    region->Set(String::NewFromUtf8(isolate, "Protect"), Number::New(isolate, (DWORD) regions[i].Protect));
-    region->Set(String::NewFromUtf8(isolate, "Type"), Number::New(isolate, (DWORD) regions[i].Type));
+    region->Set(ctx, String::NewFromUtf8(isolate, "BaseAddress", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (DWORD64) regions[i].BaseAddress));
+    region->Set(ctx, String::NewFromUtf8(isolate, "AllocationBase", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (DWORD64) regions[i].AllocationBase));
+    region->Set(ctx, String::NewFromUtf8(isolate, "AllocationProtect", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (DWORD) regions[i].AllocationProtect));
+    region->Set(ctx, String::NewFromUtf8(isolate, "RegionSize", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (SIZE_T) regions[i].RegionSize));
+    region->Set(ctx, String::NewFromUtf8(isolate, "State", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (DWORD) regions[i].State));
+    region->Set(ctx, String::NewFromUtf8(isolate, "Protect", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (DWORD) regions[i].Protect));
+    region->Set(ctx, String::NewFromUtf8(isolate, "Type", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (DWORD) regions[i].Type));
 
     char moduleName[MAX_PATH];
     DWORD size = GetModuleFileNameExA(handle, (HINSTANCE)regions[i].AllocationBase, moduleName, MAX_PATH);
 
     if (size != 0) {
-      region->Set(String::NewFromUtf8(isolate, "szExeFile"), String::NewFromUtf8(isolate, moduleName));
+      region->Set(ctx, String::NewFromUtf8(isolate, "szExeFile", v8::NewStringType::kNormal).ToLocalChecked(), 
+        String::NewFromUtf8(isolate, moduleName, v8::NewStringType::kNormal).ToLocalChecked());
     }
 
 
-    regionsArray->Set(i, region);
+    regionsArray->Set(ctx, i, region);
   }
 
   if (args.Length() == 2) {
     // Callback to let the user handle with the information
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
-    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, ""), regionsArray };
-    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, "", v8::NewStringType::kNormal).ToLocalChecked(), regionsArray };
+    callback->Call(ctx, Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(regionsArray);
@@ -1027,6 +1037,7 @@ void getRegions(const FunctionCallbackInfo<Value>& args) {
 
 void virtualQueryEx(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 2 && args.Length() != 3) {
     memoryjs::throwError("requires 2 arguments, 3 with callback", isolate);
@@ -1043,8 +1054,8 @@ void virtualQueryEx(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(ctx).FromJust();
+  DWORD64 address = args[1]->IntegerValue(ctx).FromJust();
 
   MEMORY_BASIC_INFORMATION information;
   SIZE_T result = VirtualQueryEx(handle, (LPVOID)address, &information, sizeof(information));
@@ -1064,20 +1075,27 @@ void virtualQueryEx(const FunctionCallbackInfo<Value>& args) {
 
   Local<Object> region = Object::New(isolate);
 
-  region->Set(String::NewFromUtf8(isolate, "BaseAddress"), Number::New(isolate, (DWORD64) information.BaseAddress));
-  region->Set(String::NewFromUtf8(isolate, "AllocationBase"), Number::New(isolate, (DWORD64) information.AllocationBase));
-  region->Set(String::NewFromUtf8(isolate, "AllocationProtect"), Number::New(isolate, (DWORD) information.AllocationProtect));
-  region->Set(String::NewFromUtf8(isolate, "RegionSize"), Number::New(isolate, (SIZE_T) information.RegionSize));
-  region->Set(String::NewFromUtf8(isolate, "State"), Number::New(isolate, (DWORD) information.State));
-  region->Set(String::NewFromUtf8(isolate, "Protect"), Number::New(isolate, (DWORD) information.Protect));
-  region->Set(String::NewFromUtf8(isolate, "Type"), Number::New(isolate, (DWORD) information.Type));
+  region->Set(ctx, String::NewFromUtf8(isolate, "BaseAddress", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (DWORD64) information.BaseAddress));
+  region->Set(ctx, String::NewFromUtf8(isolate, "AllocationBase", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (DWORD64) information.AllocationBase));
+  region->Set(ctx, String::NewFromUtf8(isolate, "AllocationProtect", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (DWORD) information.AllocationProtect));
+  region->Set(ctx, String::NewFromUtf8(isolate, "RegionSize", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (SIZE_T) information.RegionSize));
+  region->Set(ctx, String::NewFromUtf8(isolate, "State", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (DWORD) information.State));
+  region->Set(ctx, String::NewFromUtf8(isolate, "Protect", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (DWORD) information.Protect));
+  region->Set(ctx, String::NewFromUtf8(isolate, "Type", v8::NewStringType::kNormal).ToLocalChecked(), 
+    Number::New(isolate, (DWORD) information.Type));
 
   if (args.Length() == 3) {
     // Callback to let the user handle with the information
     Local<Function> callback = Local<Function>::Cast(args[1]);
     const unsigned argc = 2;
-    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, ""), region };
-    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, "", v8::NewStringType::kNormal).ToLocalChecked(), region };
+    callback->Call(ctx, Null(isolate), argc, argv);
   } else {
     // return JSON
     args.GetReturnValue().Set(region);
@@ -1086,6 +1104,7 @@ void virtualQueryEx(const FunctionCallbackInfo<Value>& args) {
 
 void virtualAllocEx(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 5 && args.Length() != 6) {
     memoryjs::throwError("requires 5 arguments, 6 with callback", isolate);
@@ -1102,17 +1121,17 @@ void virtualAllocEx(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  SIZE_T size = args[2]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  DWORD allocationType = args[3]->Uint32Value(isolate->GetCurrentContext()).FromJust();
-  DWORD protection = args[4]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  HANDLE handle = (HANDLE)args[0]->IntegerValue(ctx).FromJust();
+  SIZE_T size = args[2]->IntegerValue(ctx).FromJust();
+  DWORD allocationType = args[3]->Uint32Value(ctx).FromJust();
+  DWORD protection = args[4]->Uint32Value(ctx).FromJust();
   LPVOID address;
 
   // Means in the JavaScript space `null` was passed through.
   if (args[1] == Null(isolate)) {
     address = NULL;
   } else {
-    address = (LPVOID) args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
+    address = (LPVOID) args[1]->IntegerValue(ctx).FromJust();
   }
 
   LPVOID allocatedAddress = VirtualAllocEx(handle, address, size, allocationType, protection);
@@ -1136,10 +1155,10 @@ void virtualAllocEx(const FunctionCallbackInfo<Value>& args) {
     Local<Function> callback = Local<Function>::Cast(args[5]);
     const unsigned argc = 2;
     Local<Value> argv[argc] = {
-      String::NewFromUtf8(isolate, errorMessage),
+      String::NewFromUtf8(isolate, errorMessage, v8::NewStringType::kNormal).ToLocalChecked(),
       Number::New(isolate, (int)allocatedAddress)
     };
-    callback->Call(isolate->GetCurrentContext(), Null(isolate), argc, argv);
+    callback->Call(ctx, Null(isolate), argc, argv);
   } else {
     args.GetReturnValue().Set(Number::New(isolate, (int)allocatedAddress));
   }
@@ -1147,6 +1166,7 @@ void virtualAllocEx(const FunctionCallbackInfo<Value>& args) {
 
 void attachDebugger(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 2) {
     memoryjs::throwError("requires 2 arguments", isolate);
@@ -1158,8 +1178,8 @@ void attachDebugger(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  DWORD processId = args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust();
-  bool killOnExit = args[1]->BooleanValue(isolate->GetCurrentContext()).FromJust();
+  DWORD processId = args[0]->Uint32Value(ctx).FromJust();
+  bool killOnExit = args[1]->BooleanValue(isolate);
 
   bool success = debugger::attach(processId, killOnExit);
   args.GetReturnValue().Set(Boolean::New(isolate, success));
@@ -1186,6 +1206,7 @@ void detatchDebugger(const FunctionCallbackInfo<Value>& args) {
 
 void awaitDebugEvent(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 2) {
     memoryjs::throwError("requires 2 arguments", isolate);
@@ -1197,22 +1218,28 @@ void awaitDebugEvent(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  int millisTimeout = args[1]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  int millisTimeout = args[1]->Uint32Value(ctx).FromJust();
 
   DebugEvent debugEvent;
   bool success = debugger::awaitDebugEvent(millisTimeout, &debugEvent);
 
-  Register hardwareRegister = static_cast<Register>(args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust());
+  Register hardwareRegister = static_cast<Register>(args[0]->Uint32Value(ctx).FromJust());
 
   if (success && debugEvent.hardwareRegister == hardwareRegister) {
     Local<Object> info = Object::New(isolate);
 
-    info->Set(String::NewFromUtf8(isolate, "processId"), Number::New(isolate, (DWORD) debugEvent.processId));
-    info->Set(String::NewFromUtf8(isolate, "threadId"), Number::New(isolate, (DWORD) debugEvent.threadId));
-    info->Set(String::NewFromUtf8(isolate, "exceptionCode"), Number::New(isolate, (DWORD) debugEvent.exceptionCode));
-    info->Set(String::NewFromUtf8(isolate, "exceptionFlags"), Number::New(isolate, (DWORD) debugEvent.exceptionFlags));
-    info->Set(String::NewFromUtf8(isolate, "exceptionAddress"), Number::New(isolate, (DWORD64) debugEvent.exceptionAddress));
-    info->Set(String::NewFromUtf8(isolate, "hardwareRegister"), Number::New(isolate, static_cast<int>(debugEvent.hardwareRegister))); 
+    info->Set(ctx, String::NewFromUtf8(isolate, "processId", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (DWORD) debugEvent.processId));
+    info->Set(ctx, String::NewFromUtf8(isolate, "threadId", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (DWORD) debugEvent.threadId));
+    info->Set(ctx, String::NewFromUtf8(isolate, "exceptionCode", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (DWORD) debugEvent.exceptionCode));
+    info->Set(ctx, String::NewFromUtf8(isolate, "exceptionFlags", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (DWORD) debugEvent.exceptionFlags));
+    info->Set(ctx, String::NewFromUtf8(isolate, "exceptionAddress", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, (DWORD64) debugEvent.exceptionAddress));
+    info->Set(ctx, String::NewFromUtf8(isolate, "hardwareRegister", v8::NewStringType::kNormal).ToLocalChecked(), 
+      Number::New(isolate, static_cast<int>(debugEvent.hardwareRegister))); 
   
     args.GetReturnValue().Set(info);
   }
@@ -1226,6 +1253,7 @@ void awaitDebugEvent(const FunctionCallbackInfo<Value>& args) {
 
 void handleDebugEvent(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 2) {
     memoryjs::throwError("requires 2 arguments", isolate);
@@ -1237,8 +1265,8 @@ void handleDebugEvent(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  DWORD processId = args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust();
-  DWORD threadId = args[1]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  DWORD processId = args[0]->Uint32Value(ctx).FromJust();
+  DWORD threadId = args[1]->Uint32Value(ctx).FromJust();
 
   bool success = debugger::handleDebugEvent(processId, threadId);
   args.GetReturnValue().Set(Boolean::New(isolate, success));
@@ -1246,6 +1274,7 @@ void handleDebugEvent(const FunctionCallbackInfo<Value>& args) {
 
 void setHardwareBreakpoint(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 5) {
     memoryjs::throwError("requires 5 arguments", isolate);
@@ -1259,16 +1288,16 @@ void setHardwareBreakpoint(const FunctionCallbackInfo<Value>& args) {
     }
   }
 
-  DWORD processId = args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust();
-  DWORD64 address = args[1]->IntegerValue(isolate->GetCurrentContext()).FromJust();
-  Register hardwareRegister = static_cast<Register>(args[2]->Uint32Value(isolate->GetCurrentContext()).FromJust());
+  DWORD processId = args[0]->Uint32Value(ctx).FromJust();
+  DWORD64 address = args[1]->IntegerValue(ctx).FromJust();
+  Register hardwareRegister = static_cast<Register>(args[2]->Uint32Value(ctx).FromJust());
 
   // Execute = 0x0
   // Access = 0x3
   // Writer = 0x1
-  int trigger = args[3]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  int trigger = args[3]->Uint32Value(ctx).FromJust();
   
-  int length = args[4]->Uint32Value(isolate->GetCurrentContext()).FromJust();
+  int length = args[4]->Uint32Value(ctx).FromJust();
 
   bool success = debugger::setHardwareBreakpoint(processId, address, hardwareRegister, trigger, length);
   args.GetReturnValue().Set(Boolean::New(isolate, success));
@@ -1276,6 +1305,7 @@ void setHardwareBreakpoint(const FunctionCallbackInfo<Value>& args) {
 
 void removeHardwareBreakpoint(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  Local<Context> ctx = isolate->GetCurrentContext();
 
   if (args.Length() != 2) {
     memoryjs::throwError("requires 2 arguments", isolate);
@@ -1287,8 +1317,8 @@ void removeHardwareBreakpoint(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  DWORD processId = args[0]->Uint32Value(isolate->GetCurrentContext()).FromJust();
-  Register hardwareRegister = static_cast<Register>(args[1]->Uint32Value(isolate->GetCurrentContext()).FromJust());
+  DWORD processId = args[0]->Uint32Value(ctx).FromJust();
+  Register hardwareRegister = static_cast<Register>(args[1]->Uint32Value(ctx).FromJust());
 
   bool success = debugger::setHardwareBreakpoint(processId, 0, hardwareRegister, 0, 0);
   args.GetReturnValue().Set(Boolean::New(isolate, success));
