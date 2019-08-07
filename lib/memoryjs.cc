@@ -118,7 +118,7 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
   processInfo->Set(ctx, String::NewFromUtf8(isolate, "szExeFile", v8::NewStringType::kNormal).ToLocalChecked(), 
     String::NewFromUtf8(isolate, (char*)pair.process.szExeFile, v8::NewStringType::kNormal).ToLocalChecked());
   processInfo->Set(ctx, String::NewFromUtf8(isolate, "handle", v8::NewStringType::kNormal).ToLocalChecked(), 
-    Number::New(isolate, (int)pair.handle));
+    Number::New(isolate, (intptr_t)pair.handle));
 
   DWORD64 base = module::getBaseAddress((char *)pair.process.szExeFile, pair.process.th32ProcessID);
   processInfo->Set(ctx, 
@@ -156,7 +156,7 @@ void closeProcess(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  Process.closeProcess((HANDLE)args[0]->Int32Value(ctx).FromJust());
+  Process.closeProcess(reinterpret_cast<HANDLE>(static_cast<size_t>(args[0]->IntegerValue(ctx).FromJust())));
 }
 
 void getProcesses(const FunctionCallbackInfo<Value>& args) {
@@ -392,7 +392,7 @@ void readMemory(const FunctionCallbackInfo<Value>& args) {
   // Define the error message that will be set if no data type is recognised
   argv[0] = String::NewFromUtf8(isolate, "", v8::NewStringType::kNormal).ToLocalChecked();
 
-  HANDLE handle = (HANDLE)args[0]->IntegerValue(ctx).FromJust();
+  HANDLE handle = reinterpret_cast<HANDLE>(static_cast<size_t>(args[0]->IntegerValue(ctx).FromJust()));
   DWORD64 address = args[1]->IntegerValue(ctx).FromJust();
 
   if (!strcmp(dataType, "byte")) {
@@ -674,9 +674,9 @@ void writeMemory(const FunctionCallbackInfo<Value>& args) {
 
     Local<Object> value = Local<Object>::Cast(args[2]);
     Vector3 vector = {
-      value->Get(ctx, String::NewFromUtf8(isolate, "x", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust(),
-      value->Get(ctx, String::NewFromUtf8(isolate, "y", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust(),
-      value->Get(ctx, String::NewFromUtf8(isolate, "z", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust()
+      static_cast<float>(value->Get(ctx, String::NewFromUtf8(isolate, "x", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust()),
+      static_cast<float>(value->Get(ctx, String::NewFromUtf8(isolate, "y", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust()),
+      static_cast<float>(value->Get(ctx, String::NewFromUtf8(isolate, "z", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust())
     };
     Memory.writeMemory<Vector3>(handle, address, vector);
 
@@ -684,10 +684,10 @@ void writeMemory(const FunctionCallbackInfo<Value>& args) {
 
     Local<Object> value = Local<Object>::Cast(args[2]);
     Vector4 vector = {
-      value->Get(ctx, String::NewFromUtf8(isolate, "w", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust(),
-      value->Get(ctx, String::NewFromUtf8(isolate, "x", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust(),
-      value->Get(ctx, String::NewFromUtf8(isolate, "y", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust(),
-      value->Get(ctx, String::NewFromUtf8(isolate, "z", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust()
+      static_cast<float>(value->Get(ctx, String::NewFromUtf8(isolate, "w", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust()),
+      static_cast<float>(value->Get(ctx, String::NewFromUtf8(isolate, "x", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust()),
+      static_cast<float>(value->Get(ctx, String::NewFromUtf8(isolate, "y", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust()),
+      static_cast<float>(value->Get(ctx, String::NewFromUtf8(isolate, "z", v8::NewStringType::kNormal).ToLocalChecked()).ToLocalChecked()->NumberValue(ctx).FromJust())
     };
     Memory.writeMemory<Vector4>(handle, address, vector);
 
@@ -879,24 +879,24 @@ void callFunction(const FunctionCallbackInfo<Value>& args) {
   }
   
   if (returnType == T_CHAR) {
-    info->Set(ctx, keyString, Number::New(isolate, (char) data.returnValue));
+    info->Set(ctx, keyString, Number::New(isolate, *reinterpret_cast<char *>(&data.returnValue)));
   }
 
   if (returnType == T_BOOL) {
-    info->Set(ctx, keyString, Number::New(isolate, (bool) data.returnValue));
+    info->Set(ctx, keyString, Number::New(isolate, *reinterpret_cast<bool *>(&data.returnValue)));
   }
 
   if (returnType == T_INT) {
-    info->Set(ctx, keyString, Number::New(isolate, (int) data.returnValue));
+    info->Set(ctx, keyString, Number::New(isolate, *reinterpret_cast<int *>(&data.returnValue)));
   }
 
   if (returnType == T_FLOAT) {
-    float value = *(float *)&data.returnValue;
+    float value = *reinterpret_cast<float *>(&data.returnValue);
     info->Set(ctx, keyString, Number::New(isolate, value));
   }
 
   if (returnType == T_DOUBLE) {
-    double value = *(double *)&data.returnValue;
+    double value = *reinterpret_cast<double *>(&data.returnValue);
     info->Set(ctx, keyString, Number::New(isolate, value));
   }
 
@@ -1156,11 +1156,11 @@ void virtualAllocEx(const FunctionCallbackInfo<Value>& args) {
     const unsigned argc = 2;
     Local<Value> argv[argc] = {
       String::NewFromUtf8(isolate, errorMessage, v8::NewStringType::kNormal).ToLocalChecked(),
-      Number::New(isolate, (int)allocatedAddress)
+      Number::New(isolate, *reinterpret_cast<int *>(&allocatedAddress))
     };
     callback->Call(ctx, Null(isolate), argc, argv);
   } else {
-    args.GetReturnValue().Set(Number::New(isolate, (int)allocatedAddress));
+    args.GetReturnValue().Set(Number::New(isolate, *reinterpret_cast<int *>(&allocatedAddress)));
   }
 }
 

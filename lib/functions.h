@@ -63,7 +63,7 @@ namespace functions {
 
         // Little endian representation
         for (int i = 0; i < 4; i++) {
-          int shifted = ((int)address >> (i * 8)) & 0xFF;
+          int shifted = (*reinterpret_cast<int *>(&address) >> (i * 8)) & 0xFF;
           argShellcode.push_back(shifted);
         }
 
@@ -114,7 +114,7 @@ namespace functions {
       }
 
       for (int i = 0; i < 4; i++) {
-        int shifted = ((DWORD)returnValuePointer >> (i * 8)) & 0xFF;
+        int shifted = (*reinterpret_cast<DWORD *>(&returnValuePointer) >> (i * 8)) & 0xFF;
         callShellcode.push_back(shifted);
       }
     }
@@ -153,7 +153,7 @@ namespace functions {
     // Execute the shellcode
     HANDLE thread = CreateRemoteThread(pHandle, NULL, NULL, (LPTHREAD_START_ROUTINE)pShellcode, NULL, NULL, NULL);
 
-    Call data = { 0, "", -1 };
+    Call data = { 0, "", static_cast<DWORD>(-1) };
 
     if (thread == NULL) {
       *errorMessage = "Unable to create remote thread.";
