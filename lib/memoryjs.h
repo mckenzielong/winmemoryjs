@@ -4,6 +4,7 @@
 #define WIN32_LEAN_AND_MEAN
 
 #include <node.h>
+#include <napi.h>
 #include <windows.h>
 
 using v8::Isolate;

@@ -14,6 +14,7 @@
 #include "pattern.h"
 #include "functions.h"
 #include "debugger.h"
+#include <napi.h>
 
 #pragma comment(lib, "psapi.lib")
 
@@ -157,6 +158,35 @@ void closeProcess(const FunctionCallbackInfo<Value>& args) {
   }
 
   Process.closeProcess(reinterpret_cast<HANDLE>(static_cast<size_t>(args[0]->IntegerValue(ctx).FromJust())));
+}
+
+
+Napi::Value getProcessesNapi(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  // Define error message that may be set by the function that gets the processes
+  char* errorMessage = "";
+  std::vector<PROCESSENTRY32> processEntries = Process.getProcesses(&errorMessage);
+
+  if (strcmp(errorMessage, "")) {
+    Napi::TypeError::New(env, errorMessage).ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  //Loop through all processes and add them to our return value
+  Napi::Array processes = Napi::Array::New(env);
+  uint32_t  i = 0;
+  for (const auto &entry : processEntries) {
+    Napi::Object process = Napi::Object::New(env);
+    process["cntThreads"] = entry.cntThreads;
+    process["szExeFile"] = entry.szExeFile;
+    process["th32ProcessID"] = entry.th32ProcessID;
+    process["th32ParentProcessID"] = entry.th32ParentProcessID;
+    process["pcPriClassBase"] = entry.pcPriClassBase;
+    processes[i++] = process;
+  }
+
+  return processes;
 }
 
 void getProcesses(const FunctionCallbackInfo<Value>& args) {
@@ -1376,4 +1406,12 @@ void init(Local<Object> exports) {
   NODE_SET_METHOD(exports, "removeHardwareBreakpoint", removeHardwareBreakpoint);
 }
 
-NODE_MODULE(memoryjs, init)
+//NODE_MODULE(memoryjs, init)
+
+Napi::Object Init(Napi::Env env, Napi::Object exports) {
+  exports.Set(Napi::String::New(env, "getProcessesNapi"),
+              Napi::Function::New(env, getProcessesNapi));
+  return exports;
+}
+
+NODE_API_MODULE(memoryjs, Init)
