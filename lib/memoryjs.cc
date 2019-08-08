@@ -169,8 +169,7 @@ Napi::Value getProcessesNapi(const Napi::CallbackInfo& info) {
   std::vector<PROCESSENTRY32> processEntries = Process.getProcesses(&errorMessage);
 
   if (strcmp(errorMessage, "")) {
-    Napi::TypeError::New(env, errorMessage).ThrowAsJavaScriptException();
-    return env.Null();
+    throw Napi::Error::New(env, errorMessage);
   }
 
   //Loop through all processes and add them to our return value
