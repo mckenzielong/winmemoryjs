@@ -15,8 +15,8 @@ try {
 }
 
 try {
-  memoryjs.getProcessesNapi((values) => {
-    console.log(values);
+  memoryjs.getProcessesNapi((error, values) => {
+    console.log(error, values.length);
   });
 } catch(e) {
   console.log(e);

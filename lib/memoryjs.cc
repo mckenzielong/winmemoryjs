@@ -194,7 +194,8 @@ Napi::Value getProcessesNapi(const Napi::CallbackInfo& info) {
 
   if (info.Length() == 1 && info[0].IsFunction()) {
     Napi::Function callback = info[0].As<Napi::Function>();
-    callback.Call(env.Global(), { processes });
+    Napi::String error = Napi::String::New(env, errorMessage);
+    callback.Call(env.Global(), {error, processes });
     return env.Null();
   }
 
