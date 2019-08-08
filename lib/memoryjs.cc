@@ -164,6 +164,13 @@ void closeProcess(const FunctionCallbackInfo<Value>& args) {
 Napi::Value getProcessesNapi(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
 
+  //arugment checking
+  if (info.Length() > 1) {
+    throw Napi::Error::New(env, "requires either 0 arguments or 1 argument if a callback is being used");
+  } else if (info.Length() == 1 && !info[0].IsFunction()) {
+    throw Napi::Error::New(env, "first argument must be a function");
+  }
+
   // Define error message that may be set by the function that gets the processes
   char* errorMessage = "";
   std::vector<PROCESSENTRY32> processEntries = Process.getProcesses(&errorMessage);
@@ -183,6 +190,12 @@ Napi::Value getProcessesNapi(const Napi::CallbackInfo& info) {
     process["th32ParentProcessID"] = entry.th32ParentProcessID;
     process["pcPriClassBase"] = entry.pcPriClassBase;
     processes[i++] = process;
+  }
+
+  if (info.Length() == 1 && info[0].IsFunction()) {
+    Napi::Function callback = info[0].As<Napi::Function>();
+    callback.Call(env.Global(), { processes });
+    return env.Null();
   }
 
   return processes;
