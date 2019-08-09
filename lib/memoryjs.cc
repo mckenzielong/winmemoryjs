@@ -32,7 +32,6 @@ using v8::Array;
 using v8::Local;
 using v8::Boolean;
 
-process Process;
 // module Module;
 memory Memory;
 pattern Pattern;
@@ -75,11 +74,11 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
   // Define error message that may be set by the function that opens the process
   char* errorMessage = "";
 
-  process::Pair pair;
+  Process::Pair pair;
 
   if (args[0]->IsString()) {
     v8::String::Utf8Value processName(isolate, args[0]);  
-    pair = Process.openProcess((char*) *(processName), &errorMessage);
+    pair = Process::openProcess((char*) *(processName), &errorMessage);
 
     // In case it failed to open, let's keep retrying
     // while(!strcmp(process.szExeFile, "")) {
@@ -88,7 +87,7 @@ void openProcess(const FunctionCallbackInfo<Value>& args) {
   }
 
   if (args[0]->IsNumber()) {
-    pair = Process.openProcess((args[0]->Uint32Value(ctx).FromJust()), &errorMessage);
+    pair = Process::openProcess((args[0]->Uint32Value(ctx).FromJust()), &errorMessage);
 
     // In case it failed to open, let's keep retrying
     // while(!strcmp(process.szExeFile, "")) {
@@ -157,114 +156,46 @@ void closeProcess(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  Process.closeProcess(reinterpret_cast<HANDLE>(static_cast<size_t>(args[0]->IntegerValue(ctx).FromJust())));
+  Process::closeProcess(reinterpret_cast<HANDLE>(static_cast<size_t>(args[0]->IntegerValue(ctx).FromJust())));
 }
 
-
-Napi::Value getProcessesNapi(const Napi::CallbackInfo& info) {
+Napi::Value getProcesses(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
 
   //arugment checking
+  Napi::Function callback;
   if (info.Length() > 1) {
     throw Napi::Error::New(env, "requires either 0 arguments or 1 argument if a callback is being used");
   } else if (info.Length() == 1 && !info[0].IsFunction()) {
     throw Napi::Error::New(env, "first argument must be a function");
+  } else if (info.Length() == 1 && info[0].IsFunction()) {
+    callback = info[0].As<Napi::Function>();
   }
 
-  // Define error message that may be set by the function that gets the processes
-  char* errorMessage = "";
-  std::vector<PROCESSENTRY32> processEntries = Process.getProcesses(&errorMessage);
-
-  if (strcmp(errorMessage, "")) {
-    throw Napi::Error::New(env, errorMessage);
-  }
-
-  //Loop through all processes and add them to our return value
-  Napi::Array processes = Napi::Array::New(env);
-  uint32_t  i = 0;
-  for (const auto &entry : processEntries) {
-    Napi::Object process = Napi::Object::New(env);
-    process["cntThreads"] = entry.cntThreads;
-    process["szExeFile"] = entry.szExeFile;
-    process["th32ProcessID"] = entry.th32ProcessID;
-    process["th32ParentProcessID"] = entry.th32ParentProcessID;
-    process["pcPriClassBase"] = entry.pcPriClassBase;
-    processes[i++] = process;
-  }
-
-  if (info.Length() == 1 && info[0].IsFunction()) {
-    Napi::Function callback = info[0].As<Napi::Function>();
-    Napi::String error = Napi::String::New(env, errorMessage);
-    callback.Call(env.Global(), {error, processes });
-    return env.Null();
-  }
-
-  return processes;
-}
-
-void getProcesses(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  Local<Context> ctx = isolate->GetCurrentContext();
-
-  if (args.Length() > 1) {
-    memoryjs::throwError("requires either 0 arguments or 1 argument if a callback is being used", isolate);
-    return;
-  }
-
-  if (args.Length() == 1 && !args[0]->IsFunction()) {
-    memoryjs::throwError("first argument must be a function", isolate);
-    return;
-  }
-
-  // Define error message that may be set by the function that gets the processes
-  char* errorMessage = "";
-
-  std::vector<PROCESSENTRY32> processEntries = Process.getProcesses(&errorMessage);
-
-  // If an error message was returned from the function that gets the processes, throw the error.
-  // Only throw an error if there is no callback (if there's a callback, the error is passed there).
-  if (strcmp(errorMessage, "") && args.Length() != 1) {
-    memoryjs::throwError(errorMessage, isolate);
-    return;
-  }
-
-  // Creates v8 array with the size being that of the processEntries vector processes is an array of JavaScript objects
-  Local<Array> processes = Array::New(isolate, processEntries.size());
-
-  // Loop over all processes found
-  for (std::vector<PROCESSENTRY32>::size_type i = 0; i != processEntries.size(); i++) {
-    // Create a v8 object to store the current process' information
-    Local<Object> process = Object::New(isolate);
-
-    process->Set(ctx, String::NewFromUtf8(isolate, "cntThreads", v8::NewStringType::kNormal).ToLocalChecked(), 
-      Number::New(isolate, (int)processEntries[i].cntThreads));
-    process->Set(ctx, String::NewFromUtf8(isolate, "szExeFile", v8::NewStringType::kNormal).ToLocalChecked(), 
-      String::NewFromUtf8(isolate, (char *)processEntries[i].szExeFile, v8::NewStringType::kNormal).ToLocalChecked());
-    process->Set(ctx, String::NewFromUtf8(isolate, "th32ProcessID", v8::NewStringType::kNormal).ToLocalChecked(), 
-      Number::New(isolate, (int)processEntries[i].th32ProcessID));
-    process->Set(ctx, String::NewFromUtf8(isolate, "th32ParentProcessID", v8::NewStringType::kNormal).ToLocalChecked(), 
-      Number::New(isolate, (int)processEntries[i].th32ParentProcessID));
-    process->Set(ctx, String::NewFromUtf8(isolate, "pcPriClassBase", v8::NewStringType::kNormal).ToLocalChecked(), 
-      Number::New(isolate, (int)processEntries[i].pcPriClassBase));
-
-    // Push the object to the array
-    processes->Set(ctx, i, process);
-  }
-
-  /* getProcesses can either take no arguments or one argument
-     one argument is for asychronous use (the callback) */
-  if (args.Length() == 1) {
-    // Callback to let the user handle with the information
-    Local<Function> callback = Local<Function>::Cast(args[0]);
-    const unsigned argc = 2;
-    Local<Value> argv[argc] = { String::NewFromUtf8(isolate, errorMessage, v8::NewStringType::kNormal).ToLocalChecked(), processes };
-    callback->Call(ctx, Null(isolate), argc, argv);
+  auto deferred = Napi::Promise::Deferred::New(env);
+  Process::GetProcessAsync* asyncWork;
+  if (callback) {
+    asyncWork = new Process::GetProcessAsync(callback, deferred);
   } else {
-    // return JSON
-    args.GetReturnValue().Set(processes);
+    asyncWork = new Process::GetProcessAsync(env, deferred);
   }
+  
+  asyncWork->Queue();
+  return deferred.Promise();    
 }
 
+Napi::Value getProcessesSync(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  //arugment checking
+  if (info.Length() > 0) {
+    throw Napi::Error::New(env, "sync call takes no arguments");
+  }
+
+  Napi::Value processes = Process::getProcesses(env);
+  return processes;    
+}
+ 
 void getModules(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   Local<Context> ctx = isolate->GetCurrentContext();
@@ -1398,7 +1329,7 @@ std::string GetLastErrorToString() {
 void init(Local<Object> exports) {
   NODE_SET_METHOD(exports, "openProcess", openProcess);
   NODE_SET_METHOD(exports, "closeProcess", closeProcess);
-  NODE_SET_METHOD(exports, "getProcesses", getProcesses);
+  //NODE_SET_METHOD(exports, "getProcesses", getProcesses);
   NODE_SET_METHOD(exports, "getModules", getModules);
   NODE_SET_METHOD(exports, "findModule", findModule);
   NODE_SET_METHOD(exports, "readMemory", readMemory);
@@ -1422,8 +1353,10 @@ void init(Local<Object> exports) {
 //NODE_MODULE(memoryjs, init)
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
-  exports.Set(Napi::String::New(env, "getProcessesNapi"),
-              Napi::Function::New(env, getProcessesNapi));
+  exports.Set(Napi::String::New(env, "getProcessesSync"),
+              Napi::Function::New(env, getProcessesSync));
+  exports.Set(Napi::String::New(env, "getProcesses"),
+              Napi::Function::New(env, getProcesses));
   return exports;
 }
 

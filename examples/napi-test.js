@@ -1,23 +1,35 @@
 const memoryjs = require('bindings')('memoryjs.node');
 console.log(memoryjs);
-console.log(memoryjs.getProcessesNapi());
+console.log(memoryjs.getProcessesSync());
 
 try {
-  console.log(memoryjs.getProcessesNapi(55));
+  console.log(memoryjs.getProcessesSync(55));
 } catch(e) {
   console.log(e);
 }
 
 try {
-  console.log(memoryjs.getProcessesNapi(5,5));
+  console.log(memoryjs.getProcesses(5));
 } catch(e) {
   console.log(e);
 }
 
 try {
-  memoryjs.getProcessesNapi((error, values) => {
-    console.log(error, values.length);
+  memoryjs.getProcesses((error, values) => {
+    console.log(error, values.length, 'callback');
   });
 } catch(e) {
   console.log(e);
 }
+
+async function testAwait() {
+  try {
+    let bleh = memoryjs.getProcesses()
+    console.log(bleh);
+    console.log((await bleh).length, 'await');
+  } catch(e) {
+    console.log(e);
+  }
+}
+
+testAwait();
