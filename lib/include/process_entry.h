@@ -2,9 +2,11 @@
 #ifndef PROCESS_ENTRY_H
 #define PROCESS_ENTRY_H
 #define WIN32_LEAN_AND_MEAN
+#undef UNICODE
+#undef _UNICODE
 
+#include <windows.h>
 #include <TlHelp32.h>
-#include <cstdint>
 #include <napi.h>
 
 namespace MemoryAPI {
@@ -17,18 +19,18 @@ namespace MemoryAPI {
     private: 
       static Napi::FunctionReference constructor;
       int dwSize;
-      int cntUsage;
       int th32ProcessID;
-      uintptr_t th32DefaultHeapID;
-      int th32ModuleID;
       int cntThreads;
       int th32ParentProcessID;
       long pcPriClassBase;
-      int dwFlags;
-      char* szExeFile;
-      
-      
+      std::string szExeFile;
+
       Napi::Value getDwSize(const Napi::CallbackInfo &info);
+      Napi::Value getTh32ProcessID(const Napi::CallbackInfo &info);
+      Napi::Value getCntThreads(const Napi::CallbackInfo &info);
+      Napi::Value getTh32ParentProcessID(const Napi::CallbackInfo &info);
+      Napi::Value getPcPriClassBase(const Napi::CallbackInfo &info);
+      Napi::Value getSzExeFile(const Napi::CallbackInfo &info);
   };
 }
 

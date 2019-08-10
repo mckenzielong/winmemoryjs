@@ -1,7 +1,12 @@
 const memoryjs = require('bindings')('memoryjs.node');
+const util = require('util');
+
 console.log(memoryjs);
 let syncTest = memoryjs.getProcessesSync()
-console.log(syncTest);
+for (let i = 0; i < 20; i++) {
+  console.log(syncTest[i]);
+}
+
 console.log(syncTest.map(x => x.dwSize));
 
 try {
