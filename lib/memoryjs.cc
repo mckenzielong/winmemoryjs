@@ -14,6 +14,7 @@
 #include "pattern.h"
 #include "functions.h"
 #include "debugger.h"
+#include "process_entry.h"
 #include <napi.h>
 
 #pragma comment(lib, "psapi.lib")
@@ -179,7 +180,7 @@ Napi::Value getProcesses(const Napi::CallbackInfo& info) {
   } else {
     asyncWork = new Process::GetProcessAsync(env, deferred);
   }
-  
+
   asyncWork->Queue();
   return deferred.Promise();    
 }
@@ -1357,6 +1358,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
               Napi::Function::New(env, getProcessesSync));
   exports.Set(Napi::String::New(env, "getProcesses"),
               Napi::Function::New(env, getProcesses));
+
+  MemoryAPI::ProcessEntry::Init(env, exports);
+
   return exports;
 }
 

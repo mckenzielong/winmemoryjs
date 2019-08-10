@@ -2,7 +2,9 @@
 #include <TlHelp32.h>
 #include <vector>
 #include <napi.h>
+
 #include "process.h"
+#include "process_entry.h"
 
 Napi::Value convertProcessEntryArray(Napi::Env env, const std::vector<PROCESSENTRY32> &processEntries) {
   //Loop through all processes and add them to our return value
@@ -114,7 +116,13 @@ Napi::Value Process::getProcesses(Napi::Env env) {
     throw Napi::Error::New(env, errorMessage);
   }
 
-  return convertProcessEntryArray(env, processEntries);
+  //Loop through all processes and add them to our return value
+  Napi::Array processes = Napi::Array::New(env);
+  uint32_t  i = 0;
+  for (const auto &entry : processEntries) {
+    processes[i++] = MemoryAPI::ProcessEntry::New(env, entry);
+  }
+  return processes;
 }
 
 void Process::GetProcessAsync::Execute() {

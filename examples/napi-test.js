@@ -1,6 +1,14 @@
 const memoryjs = require('bindings')('memoryjs.node');
 console.log(memoryjs);
-console.log(memoryjs.getProcessesSync());
+let syncTest = memoryjs.getProcessesSync()
+console.log(syncTest);
+console.log(syncTest.map(x => x.dwSize));
+
+try {
+  let args = new memoryjs.ProcessEntry();
+} catch(e) {
+  console.log(e);
+}
 
 try {
   console.log(memoryjs.getProcessesSync(55));
@@ -24,6 +32,7 @@ try {
 
 async function testAwait() {
   try {
+
     let bleh = memoryjs.getProcesses()
     console.log(bleh);
     console.log((await bleh).length, 'await');
