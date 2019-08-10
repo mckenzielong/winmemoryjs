@@ -2,8 +2,6 @@
 #ifndef PROCESS_ENTRY_H
 #define PROCESS_ENTRY_H
 #define WIN32_LEAN_AND_MEAN
-#undef UNICODE
-#undef _UNICODE
 
 #include <windows.h>
 #include <TlHelp32.h>
