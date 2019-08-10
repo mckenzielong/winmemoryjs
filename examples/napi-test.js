@@ -2,12 +2,10 @@ const memoryjs = require('bindings')('memoryjs.node');
 const util = require('util');
 
 console.log(memoryjs);
-let syncTest = memoryjs.getProcessesSync()
+let processes = memoryjs.getProcessesSync()
 for (let i = 0; i < 20; i++) {
-  console.log(syncTest[i]);
+  console.log(processes[i]);
 }
-
-console.log(syncTest.map(x => x.dwSize));
 
 try {
   let args = new memoryjs.ProcessEntry();
@@ -47,3 +45,7 @@ async function testAwait() {
 }
 
 testAwait();
+
+let notepad = processes.filter(x => x.szExeFile === 'notepad.exe')[0];
+notepad.openProcess();
+notepad.closeProcess();

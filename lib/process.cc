@@ -104,6 +104,23 @@ Process::Pair Process::openProcess(DWORD processId, char** errorMessage) {
   };
 }
 
+HANDLE Process::openProcess(long processId, std::string* errorMessage) {
+  HANDLE handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processId);
+
+  if (handle == NULL) {
+    *errorMessage = "unable to find process";
+  }
+  
+  return handle;
+}
+
+void Process::closeProcess(HANDLE hProcess, std::string* errorMessage){
+  bool success = CloseHandle(hProcess);
+  if (!success) {
+    *errorMessage = "unable to close file handle";
+  }
+}
+
 void Process::closeProcess(HANDLE hProcess){
   CloseHandle(hProcess);
 }

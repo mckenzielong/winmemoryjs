@@ -16,7 +16,10 @@ namespace Process {
   Napi::Value getProcesses(Napi::Env env);
   Pair openProcess(const char* processName, char** errorMessage);
   Pair openProcess(DWORD processId, char** errorMessage);
+  HANDLE openProcess(long processId, std::string* errorMessage);
+
   void closeProcess(HANDLE hProcess);
+  void closeProcess(HANDLE hProcess, std::string* errorMessage);
 
   class GetProcessAsync : public Napi::AsyncWorker {
     public:    
