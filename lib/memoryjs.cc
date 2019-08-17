@@ -15,6 +15,7 @@
 #include "functions.h"
 #include "debugger.h"
 #include "process_entry.h"
+#include "promise_async.h"
 #include <napi.h>
 
 #pragma comment(lib, "psapi.lib")
@@ -174,11 +175,11 @@ Napi::Value getProcesses(const Napi::CallbackInfo& info) {
   }
 
   auto deferred = Napi::Promise::Deferred::New(env);
-  Process::GetProcessAsync* asyncWork;
+  AsyncHelper::PromiseAsyncWorker<std::vector<PROCESSENTRY32>>* asyncWork;
   if (callback) {
-    asyncWork = new Process::GetProcessAsync(callback, deferred);
+    asyncWork = new AsyncHelper::PromiseAsyncWorker<std::vector<PROCESSENTRY32>>(callback, deferred, Process::getWindowsProcesses, Process::convertProcessEntryArray);
   } else {
-    asyncWork = new Process::GetProcessAsync(env, deferred);
+    asyncWork = new AsyncHelper::PromiseAsyncWorker<std::vector<PROCESSENTRY32>>(env, deferred, Process::getWindowsProcesses, Process::convertProcessEntryArray);
   }
 
   asyncWork->Queue();

@@ -6,7 +6,7 @@
 #include "process.h"
 #include "process_entry.h"
 
-Napi::Value convertProcessEntryArray(Napi::Env env, const std::vector<PROCESSENTRY32> &processEntries) {
+Napi::Value Process::convertProcessEntryArray(Napi::Env env, const std::vector<PROCESSENTRY32> &processEntries) {
   //Loop through all processes and add them to our return value
   Napi::Array processes = Napi::Array::New(env);
   uint32_t  i = 0;
@@ -49,6 +49,16 @@ std::vector<PROCESSENTRY32> getProcessesInternal(char** errorMessage) {
   } while (Process32Next(hProcessSnapshot, &pEntry));
 
   CloseHandle(hProcessSnapshot);
+  return processes;
+}
+
+std::vector<PROCESSENTRY32> Process::getWindowsProcesses(Napi::Env env) {
+  char* err = "";
+  auto processes = getProcessesInternal(&err);
+  if (strcmp(err, "")) {
+    throw Napi::Error::New(env, err);
+  }
+
   return processes;
 }
 
@@ -140,29 +150,4 @@ Napi::Value Process::getProcesses(Napi::Env env) {
     processes[i++] = MemoryAPI::ProcessEntry::New(env, entry);
   }
   return processes;
-}
-
-void Process::GetProcessAsync::Execute() {
-  char* err = "";
-  processes = getProcessesInternal(&err);
-  if (strcmp(err, "")) {
-    throw Napi::Error::New(Env(), err);
-  }
-}
-
-void Process::GetProcessAsync::OnOK() {
-  Napi::HandleScope scope(Env());
-  Napi::Value procs = convertProcessEntryArray(Env(), processes);
-  if (Callback()) {
-    Callback().Call({Env().Null(), procs});
-  }
-  promise.Resolve(procs);
-}
-
-void Process::GetProcessAsync::OnError(const Napi::Error& e) {
-  Napi::HandleScope scope(Env());
-  if (Callback()) {
-    Callback().Call({e.Value(), Env().Null()});
-  }
-  promise.Reject(e.Value());
 }
