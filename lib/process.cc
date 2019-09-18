@@ -11,13 +11,7 @@ Napi::Value Process::convertProcessEntryArray(Napi::Env env, const std::vector<P
   Napi::Array processes = Napi::Array::New(env);
   uint32_t  i = 0;
   for (const auto &entry : processEntries) {
-    Napi::Object process = Napi::Object::New(env);
-    process["cntThreads"] = entry.cntThreads;
-    process["szExeFile"] = entry.szExeFile;
-    process["th32ProcessID"] = entry.th32ProcessID;
-    process["th32ParentProcessID"] = entry.th32ParentProcessID;
-    process["pcPriClassBase"] = entry.pcPriClassBase;
-    processes[i++] = process;
+    processes[i++] = MemoryAPI::ProcessEntry::New(env, entry);
   }
   return processes;
 }

@@ -15,6 +15,7 @@
 #include "functions.h"
 #include "debugger.h"
 #include "process_entry.h"
+#include "module_entry.h"
 #include "promise_async.h"
 #include <napi.h>
 
@@ -1361,6 +1362,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
               Napi::Function::New(env, getProcesses));
 
   MemoryAPI::ProcessEntry::Init(env, exports);
+  MemoryAPI::ModuleEntry::Init(env, exports);
 
   return exports;
 }

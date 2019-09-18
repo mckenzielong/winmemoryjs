@@ -1,5 +1,8 @@
 #include "process_entry.h"
 #include "process.h"
+#include "module.h"
+#include "module_entry.h"
+#include "promise_async.h"
 
 using namespace MemoryAPI;
 
@@ -36,6 +39,7 @@ Napi::Object ProcessEntry::Init(Napi::Env env, Napi::Object exports) {
         InstanceAccessor("th32ParentProcessID", &getTh32ParentProcessID, NULL),
         InstanceAccessor("pcPriClassBase", &getPcPriClassBase, NULL),
         InstanceAccessor("szExeFile", &getSzExeFile, NULL),
+        InstanceAccessor("modules", &getModules, NULL),
         InstanceMethod("openProcess", &openProcess),
         InstanceMethod("closeProcess", &closeProcess),
     });
@@ -68,6 +72,12 @@ Napi::Value ProcessEntry::getPcPriClassBase(const Napi::CallbackInfo &info) {
 
 Napi::Value ProcessEntry::getSzExeFile(const Napi::CallbackInfo &info) {
   return Napi::String::New(info.Env(), szExeFile);
+}
+
+Napi::Value ProcessEntry::getModules(const Napi::CallbackInfo &info) {
+  Napi::Env env = info.Env();
+  std::vector<MODULEENTRY32> winModules = module::getWindowsModules(th32ProcessID, env);
+  return module::convertModuleEntryArray(env, winModules);  
 }
 
 Napi::Value ProcessEntry::openProcess(const Napi::CallbackInfo &info) {

@@ -18,10 +18,10 @@ namespace MemoryAPI {
     private: 
       static Napi::FunctionReference constructor;
       int dwSize;
+      void *modBaseAddr;
+      int modBaseSize;
       int th32ProcessID;
-      int cntThreads;
-      int th32ParentProcessID;
-      long pcPriClassBase;
+      std::string szModule;
       std::string szExePath;
 
       Napi::Value getDwSize(const Napi::CallbackInfo &info);
