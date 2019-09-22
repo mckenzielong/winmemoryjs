@@ -24,7 +24,7 @@ namespace MemoryAPI {
       long pcPriClassBase;
       std::string szExeFile;
       void* handle;
-      Napi::Value modules;
+      Napi::ObjectReference modules;
 
       Napi::Value getDwSize(const Napi::CallbackInfo &info);
       Napi::Value getTh32ProcessID(const Napi::CallbackInfo &info);

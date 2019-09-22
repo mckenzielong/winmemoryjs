@@ -76,8 +76,12 @@ Napi::Value ProcessEntry::getSzExeFile(const Napi::CallbackInfo &info) {
 
 Napi::Value ProcessEntry::getModules(const Napi::CallbackInfo &info) {
   Napi::Env env = info.Env();
+  if (modules) {
+    return modules.Value();
+  }
   std::vector<MODULEENTRY32> winModules = module::getWindowsModules(th32ProcessID, env);
-  return module::convertModuleEntryArray(env, winModules);  
+  modules = Napi::ObjectReference::New(module::convertModuleEntryArray(env, winModules).ToObject(), 1);
+  return modules.Value();  
 }
 
 Napi::Value ProcessEntry::openProcess(const Napi::CallbackInfo &info) {
@@ -119,5 +123,9 @@ ProcessEntry::~ProcessEntry() {
   if (handle) {
     std::string err = "";
     Process::closeProcess(handle, &err);
+  }
+
+  if (modules) {
+    modules.Unref();
   }
 }
