@@ -1,28 +1,29 @@
 const memoryjs = require('bindings')('memoryjs.node');
-const util = require('util');
+const nodeProcess = require('process');
+const assert = require('assert');
 
-console.log(memoryjs);
 let processes = memoryjs.getProcessesSync()
-for (let i = 0; i < 20; i++) {
-  console.log(processes[i]);
-}
+
 
 try {
   let args = new memoryjs.ProcessEntry();
 } catch(e) {
-  console.log(e);
+  assert(e instanceof TypeError);
+  assert.strictEqual(e.message, 'Must be of type PROCESSENTRY32');
 }
 
 try {
   console.log(memoryjs.getProcessesSync(55));
 } catch(e) {
-  console.log(e);
+  assert(e instanceof Error);
+  assert.strictEqual(e.message, 'sync call takes no arguments');
 }
 
 try {
   console.log(memoryjs.getProcesses(5));
 } catch(e) {
-  console.log(e);
+  assert(e instanceof Error);
+  assert.strictEqual(e.message, 'first argument must be a function');
 }
 
 try {
@@ -46,6 +47,9 @@ async function testAwait() {
 
 testAwait();
 
-let notepad = processes.filter(x => x.szExeFile === 'notepad.exe')[0];
-notepad.openProcess();
-notepad.closeProcess();
+let thisProc = processes.filter(x => x.th32ProcessID === nodeProcess.pid)[0];
+assert.strictEqual(thisProc.szExeFile, 'node.exe');
+thisProc.openProcess();
+thisProc.closeProcess();
+
+memoryAddon = thisProc.modules.filter(x => x.szModule === 'memoryjs.node');
