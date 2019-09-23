@@ -7,11 +7,13 @@
         "lib/memory.cc",
         "lib/process.cc",
         "lib/module.cc",
+        "lib/thread.cc",
         "lib/pattern.cc",
         "lib/functions.cc",
         "lib/debugger.cc",
         "lib/process_entry.cc",
-        "lib/module_entry.cc"
+        "lib/module_entry.cc",
+        "lib/thread_entry.cc"
       ],
       'include_dirs': ["<!@(node -p \"require('node-addon-api').include\")", "lib/include"],
       'dependencies': ["<!(node -p \"require('node-addon-api').gyp\")"],

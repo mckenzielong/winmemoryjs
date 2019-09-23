@@ -13,7 +13,7 @@ namespace MemoryAPI {
       static Napi::Object Init(Napi::Env env, Napi::Object exports);
       ThreadEntry(const Napi::CallbackInfo& info);
       ~ThreadEntry();
-      static Napi::Object New(Napi::Env env, const THREADENTRY32 &entry);
+      static Napi::Object New(Napi::Env env, const THREADENTRY32& entry);
 
     private: 
       static Napi::FunctionReference constructor;
@@ -21,11 +21,13 @@ namespace MemoryAPI {
       int th32ThreadID;
       int th32OwnerProcessID;
       long tpBasePri;
+      long tpDeltaPri;
 
       Napi::Value getDwSize(const Napi::CallbackInfo &info);
       Napi::Value getTh32ThreadID(const Napi::CallbackInfo &info);
       Napi::Value getTh32OwnerProcessID(const Napi::CallbackInfo &info);
       Napi::Value getTpBasePri(const Napi::CallbackInfo &info);
+      Napi::Value getTpDeltaPri(const Napi::CallbackInfo &info);
   };
 }
 

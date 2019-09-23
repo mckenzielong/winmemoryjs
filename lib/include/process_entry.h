@@ -25,6 +25,7 @@ namespace MemoryAPI {
       std::string szExeFile;
       void* handle;
       Napi::ObjectReference modules;
+      Napi::ObjectReference threads;
 
       Napi::Value getDwSize(const Napi::CallbackInfo &info);
       Napi::Value getTh32ProcessID(const Napi::CallbackInfo &info);
@@ -33,6 +34,7 @@ namespace MemoryAPI {
       Napi::Value getPcPriClassBase(const Napi::CallbackInfo &info);
       Napi::Value getSzExeFile(const Napi::CallbackInfo &info);
       Napi::Value getModules(const Napi::CallbackInfo &info);
+      Napi::Value getThreads(const Napi::CallbackInfo &info);
       Napi::Value openProcess(const Napi::CallbackInfo &info);
       Napi::Value closeProcess(const Napi::CallbackInfo &info);
   };

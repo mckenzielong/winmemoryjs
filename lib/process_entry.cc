@@ -1,7 +1,9 @@
 #include "process_entry.h"
 #include "process.h"
 #include "module.h"
+#include "thread.h"
 #include "module_entry.h"
+#include "thread_entry.h"
 #include "promise_async.h"
 
 using namespace MemoryAPI;
@@ -10,7 +12,7 @@ Napi::FunctionReference ProcessEntry::constructor;
 
 //Return a new object wrapped entry
 Napi::Object ProcessEntry::New(Napi::Env env, const PROCESSENTRY32 &entry) {
-    auto convertedEntry = Napi::External<PROCESSENTRY32>::New(env, &static_cast<PROCESSENTRY32>(entry));
+    auto convertedEntry = Napi::External<PROCESSENTRY32>::New(env, const_cast<PROCESSENTRY32 *>(&entry));
     return constructor.New({convertedEntry});
 }
 
@@ -40,6 +42,7 @@ Napi::Object ProcessEntry::Init(Napi::Env env, Napi::Object exports) {
         InstanceAccessor("pcPriClassBase", &getPcPriClassBase, NULL),
         InstanceAccessor("szExeFile", &getSzExeFile, NULL),
         InstanceAccessor("modules", &getModules, NULL),
+        InstanceAccessor("threads", &getThreads, NULL),
         InstanceMethod("openProcess", &openProcess),
         InstanceMethod("closeProcess", &closeProcess),
     });
@@ -82,6 +85,16 @@ Napi::Value ProcessEntry::getModules(const Napi::CallbackInfo &info) {
   std::vector<MODULEENTRY32> winModules = module::getWindowsModules(th32ProcessID, env);
   modules = Napi::ObjectReference::New(module::convertModuleEntryArray(env, winModules).ToObject(), 1);
   return modules.Value();  
+}
+
+Napi::Value ProcessEntry::getThreads(const Napi::CallbackInfo &info) {
+  Napi::Env env = info.Env();
+  if (threads) {
+    return threads.Value();
+  }
+  std::vector<THREADENTRY32> winThreads = Thread::getWindowsThreads(th32ProcessID, env);
+  threads = Napi::ObjectReference::New(Thread::convertThreadEntryArray(env, winThreads).ToObject(), 1);
+  return threads.Value();  
 }
 
 Napi::Value ProcessEntry::openProcess(const Napi::CallbackInfo &info) {
@@ -127,5 +140,9 @@ ProcessEntry::~ProcessEntry() {
 
   if (modules) {
     modules.Unref();
+  }
+
+  if (threads) {
+    threads.Unref();
   }
 }

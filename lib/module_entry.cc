@@ -6,7 +6,7 @@ Napi::FunctionReference ModuleEntry::constructor;
 
 //Return a new object wrapped entry
 Napi::Object ModuleEntry::New(Napi::Env env, const MODULEENTRY32 &entry) {
-    auto convertedEntry = Napi::External<MODULEENTRY32>::New(env, &static_cast<MODULEENTRY32>(entry));
+    auto convertedEntry = Napi::External<MODULEENTRY32>::New(env, const_cast<MODULEENTRY32 *>(&entry));
     return constructor.New({convertedEntry});
 }
 
