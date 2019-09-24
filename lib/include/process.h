@@ -16,10 +16,7 @@ namespace Process {
   Napi::Value getProcesses(Napi::Env env);
   std::vector<PROCESSENTRY32> getWindowsProcesses(Napi::Env env);
   Napi::Value convertProcessEntryArray(Napi::Env env, const std::vector<PROCESSENTRY32> &processEntries);
-  Pair openProcess(const char* processName, char** errorMessage);
-  Pair openProcess(DWORD processId, char** errorMessage);
   HANDLE openProcess(long processId, std::string* errorMessage);
-  void closeProcess(HANDLE hProcess);
   void closeProcess(HANDLE hProcess, std::string* errorMessage);
 }
 

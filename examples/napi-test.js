@@ -1,4 +1,4 @@
-const memoryjs = require('bindings')('memoryjs.node');
+const memoryjs = require('bindings')('winmemoryjs.node');
 const nodeProcess = require('process');
 const assert = require('assert');
 
@@ -36,7 +36,6 @@ try {
 
 async function testAwait() {
   try {
-
     let bleh = memoryjs.getProcesses()
     console.log(bleh);
     console.log((await bleh).length, 'await');

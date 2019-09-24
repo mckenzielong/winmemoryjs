@@ -1,39 +1,40 @@
 {
-  "name": "memoryjs",
-  "version": "3.3.1",
-  "description": "Node add-on for memory reading and writing!",
+  "name": "@mckenzielong/winmemoryjs",
+  "version": "0.0.1",
+  "description": "N-API add-on for Windows memory and processes",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "install": "node-gyp rebuild",
-    "build32": "node-gyp clean configure build --arch=ia32",
-    "build64": "node-gyp clean configure build --arch=x64"
+    "build": "node-gyp clean configure build --arch=x64"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Rob--/memoryjs.git"
+    "url": "git+https://github.com/mckenzielong/winmemoryjs.git"
   },
   "keywords": [
     "memory",
+    "windows",
     "reading",
-    "writing",
-    "management",
-    "addon"
+    "process"
   ],
-  "author": "Rob--",
+  "contributors": [
+    {
+      "name": "McKenzie Long"
+    },
+    {
+      "name": "Rob--",
+      "url": "https://github.com/Rob--/"
+    }
+  ],
   "license": "MIT",
   "gypfile": true,
   "bugs": {
-    "url": "https://github.com/Rob--/memoryjs/issues"
+    "url": "https://github.com/mckenzielong/winmemoryjs"
   },
-  "homepage": "https://github.com/Rob--/memoryjs#readme",
+  "homepage": "https://github.com/mckenzielong/winmemoryjs",
   "dependencies": {
     "bindings": "^1.5.0",
-    "concentrate": "^0.2.3",
-    "dissolve": "^0.3.3",
-    "eslint": "^5.16.0",
-    "eslint-config-airbnb-base": "^12.1.0",
-    "eslint-plugin-import": "^2.8.0",
     "node-addon-api": "^1.7.1"
   }
 }

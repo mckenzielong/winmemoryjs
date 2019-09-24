@@ -1,7 +1,3 @@
-#include <windows.h>
-#include <TlHelp32.h>
-#include <vector>
-#include <napi.h>
 
 #include "process.h"
 #include "process_entry.h"
@@ -56,58 +52,6 @@ std::vector<PROCESSENTRY32> Process::getWindowsProcesses(Napi::Env env) {
   return processes;
 }
 
-Process::Pair Process::openProcess(const char* processName, char** errorMessage){
-  PROCESSENTRY32 process;
-  HANDLE handle = NULL;
-
-  // A list of processes (PROCESSENTRY32)
-  std::vector<PROCESSENTRY32> processes = getProcessesInternal(errorMessage);
-
-  for (std::vector<PROCESSENTRY32>::size_type i = 0; i != processes.size(); i++) {
-    // Check to see if this is the process we want.
-    if (!strcmp((char *)processes[i].szExeFile, processName)) {
-      handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processes[i].th32ProcessID);
-      process = processes[i];
-      break;
-    }
-  }
-
-  if (handle == NULL) {
-    *errorMessage = "unable to find process";
-  }
-
-  return {
-    handle,
-    process,
-  };
-}
-
-Process::Pair Process::openProcess(DWORD processId, char** errorMessage) {
-  PROCESSENTRY32 process;
-  HANDLE handle = NULL;
-
-  // A list of processes (PROCESSENTRY32)
-  std::vector<PROCESSENTRY32> processes = getProcessesInternal(errorMessage);
-
-  for (std::vector<PROCESSENTRY32>::size_type i = 0; i != processes.size(); i++) {
-    // Check to see if this is the process we want.
-    if (processId == processes[i].th32ProcessID) {
-      handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processes[i].th32ProcessID);
-      process = processes[i];
-      break;
-    }
-  }
-
-  if (handle == NULL) {
-    *errorMessage = "unable to find process";
-  }
-
-  return {
-    handle,
-    process,
-  };
-}
-
 HANDLE Process::openProcess(long processId, std::string* errorMessage) {
   HANDLE handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processId);
 
@@ -123,10 +67,6 @@ void Process::closeProcess(HANDLE hProcess, std::string* errorMessage){
   if (!success) {
     *errorMessage = "unable to close file handle";
   }
-}
-
-void Process::closeProcess(HANDLE hProcess){
-  CloseHandle(hProcess);
 }
 
 Napi::Value Process::getProcesses(Napi::Env env) {
