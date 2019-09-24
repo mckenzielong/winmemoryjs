@@ -1,5 +1,5 @@
 const memoryjs = require('../index');
-const processName = 'Testing Things.exe';
+const processName = 'notepad.exe';
 
 const processObject = memoryjs.openProcess(processName);
 const processId = processObject.th32ProcessID;

@@ -3,28 +3,25 @@
 #define PROCESS_H
 #define WIN32_LEAN_AND_MEAN
 
-#include <node.h>
 #include <windows.h>
 #include <TlHelp32.h>
 #include <vector>
+#include <napi.h>
 
-using v8::Isolate;
-
-class process {
-public:
+namespace Process {
   struct Pair {
     HANDLE handle;
     PROCESSENTRY32 process;
   };
-
-  process();
-  ~process();
-
+  Napi::Value getProcesses(Napi::Env env);
+  std::vector<PROCESSENTRY32> getWindowsProcesses(Napi::Env env);
+  Napi::Value convertProcessEntryArray(Napi::Env env, const std::vector<PROCESSENTRY32> &processEntries);
   Pair openProcess(const char* processName, char** errorMessage);
   Pair openProcess(DWORD processId, char** errorMessage);
+  HANDLE openProcess(long processId, std::string* errorMessage);
   void closeProcess(HANDLE hProcess);
-  std::vector<PROCESSENTRY32> getProcesses(char** errorMessage);
-};
+  void closeProcess(HANDLE hProcess, std::string* errorMessage);
+}
 
 #endif
 #pragma once

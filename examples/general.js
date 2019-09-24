@@ -1,4 +1,4 @@
-const memoryjs = require('./index');
+const memoryjs = require('../index');
 const processName = 'csgo.exe';
 let clientModule;
 const offset = 0x00A9D44C;
