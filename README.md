@@ -1,6 +1,6 @@
 # winmemoryjs &middot; [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/mckenzielong/winmemoryjs/blob/master/LICENSE.md) 
 
-winmemoryjs began life as a fork of https://github.com/Rob--/memoryjs. I started this as a learning project to play around with electron and ffxiv memory reading, but after it didn't compile on newer versions of node, I kind of went down a rabbit hole and ended up with this mess. Basically, since memoryjs was written using the v8 structures, winmemoryjs began life as a port to node-addon-api. It quickly turned into its own gross thing. Ideally the feature set of this will cover a similar range of memoryjs, however that project.
+winmemoryjs began life as a fork of https://github.com/Rob--/memoryjs. I started this as a learning project to play around with electron and ffxiv memory reading, but after it didn't compile on newer versions of node, I kind of went down a rabbit hole and ended up with this mess. Basically, since memoryjs was written using the v8 structures, winmemoryjs began life as a port to node-addon-api. It quickly turned into its own gross thing. Ideally the feature set of this will cover a similar range of memoryjs, however that project is much more mature.
 
 # Features
 
